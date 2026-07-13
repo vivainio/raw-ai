@@ -346,17 +346,28 @@ split Identity uses further down, just applied to the gateway's own
 outbound calls instead of the agent's.
 
 The search half works the same way as any other tool: a gateway created
-with search enabled stands up a vector store
-behind the scenes, embeds every attached tool's name and description into
-it, and exposes one more MCP tool, `x_amz_bedrock_agentcore_search`, that
-takes a `query` string and returns whichever tools match. An agent
-sitting in front of hundreds of tools calls that search tool first, gets
-back the handful that are relevant, and only those descriptions ever land
-in context — instead of every tool description being loaded up front
-regardless of whether that turn needs it. Both halves — spec-to-tool
-generation and searchable tool discovery — are things you'd otherwise
-build by hand, which is why Gateway is a real time save rather than a
-managed wrapper around something trivial.
+with search enabled stands up a vector store behind the scenes, embeds
+every attached tool's name and description into it, and exposes one more
+MCP tool, `x_amz_bedrock_agentcore_search`, that takes a `query` string
+and returns whichever tools match. An agent sitting in front of hundreds
+of tools calls that search tool first, gets back the handful that are
+relevant, and only those descriptions ever land in context — instead of
+every tool description being loaded up front regardless of whether that
+turn needs it.
+
+Turning an OpenAPI spec into callable tools isn't itself an AWS-only
+trick — several self-hosted libraries do that same conversion for free,
+so "spec in, tools out" alone doesn't justify Gateway's existence. What a
+local converter doesn't hand you is the other two pieces: the downstream
+API credential lives in the gateway's credential provider, not in the
+agent's own process or context, so a compromised or misbehaving agent
+can't leak or misuse it directly; and the search tool is a managed vector
+index you didn't have to stand up and keep in sync as tools get added or
+removed. Skip both — a handful of tools, agent already trusted with the
+API key — and a local OpenAPI-to-MCP converter gets most of the value
+with one less service to operate. Gateway earns its keep specifically
+when the tool count or the credential-isolation requirement gets large
+enough that those two gaps start to matter.
 
 ### Identity
 
