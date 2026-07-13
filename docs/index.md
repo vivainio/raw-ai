@@ -48,6 +48,9 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [RAG](rag/index.md) — retrieval-augmented generation stripped down to
+  what it actually is: chunk, embed, search — and why an agent should call
+  that search as a tool instead of running it once before its first turn.
 - [Prompt Caching](llm-caching/index.md) — why a cache is a prefix match,
   not a lookup table: breakpoint placement, the write/read cost tradeoff,
   and the silent invalidators that quietly turn a cached agent back into
