@@ -18,6 +18,13 @@ for ten minutes of content, no podcast to have on in the background hoping
 something useful lands. If a topic takes three paragraphs, it gets three
 paragraphs and stops.
 
+Most video and podcast content about AI ends up disappointing anyway —
+not because the format is wrong, but because so much of it stalls at the
+same entry-level material: what a prompt is, what a token is, the same
+three demos everyone already did. That's fine as a first pass, but it's
+the first ten minutes of every video, forever, rarely the ninety after it.
+Text doesn't fix that by itself, but it makes padding much harder to hide.
+
 Written with AI — which is very fitting for a book about AI. The human role
 here is closer to curator or producer than author — deciding what's worth
 covering, what's accurate, and what gets cut — not typing every sentence by
