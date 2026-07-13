@@ -718,6 +718,44 @@ hand — all three of which Runtime still requires. The CLI path
 same config and gets a scaffolded project instead of raw API calls, but
 it's the same trade either way.
 
+Continuing or steering a session later is the same `messages` list from
+the first call — there's no separate "append to conversation" API. Call
+`invoke_harness` again on the same `runtimeSessionId` with a new `user`
+message and the harness picks up where it left off, memory and file state
+intact. The one case that isn't a plain next turn is an **inline
+function**: a tool type that deliberately never runs on the harness VM at
+all. Declare one, and when the model calls it, the harness pauses
+mid-turn — the stream ends with `stopReason: "tool_use"` — and hands the
+call back to you instead of executing anything itself. Resuming means
+sending both halves back in one `invoke_harness` call: the assistant's
+`toolUse` message and your own `toolResult` message.
+
+```python
+response = data_client.invoke_harness(
+    harnessArn=harness_arn,
+    runtimeSessionId=session_id,
+    messages=[
+        {"role": "assistant", "content": [{"toolUse": {
+            "toolUseId": tool_use_id, "name": "approve_purchase", "input": tool_input,
+        }}]},
+        {"role": "user", "content": [{"toolResult": {
+            "toolUseId": tool_use_id,
+            "content": [{"text": "approved"}],
+            "status": "success",
+        }}]},
+    ],
+)
+```
+
+Both messages are required, not just the result — the harness deliberately
+doesn't persist a half-finished turn (an assistant `toolUse` with no
+matching `toolResult` yet) to the session, specifically so a client that
+never comes back with an answer can't leave the conversation stuck in a
+corrupted state. Send both together and the model resumes reasoning with
+the result in hand, same as any other tool call; the difference from a
+Gateway or Browser tool is entirely about who ran the code, not how the
+message gets back into the loop.
+
 Which makes pydantic.ai the wrong comparison. Pydantic.ai, like Strands
 itself, LangGraph, or CrewAI, is a library you import and write Python
 against — a real reduction in boilerplate, but you still own the loop and
