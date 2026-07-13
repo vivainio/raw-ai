@@ -12,9 +12,10 @@ with the reason. If it doesn't, that's said too.
 
 It grows one topic at a time, not from a fixed curriculum.
 
-Written with AI. The human role here is closer to curator or producer than
-author — deciding what's worth covering, what's accurate, and what gets cut —
-not typing every sentence by hand.
+Written with AI — which is very fitting for a book about AI. The human role
+here is closer to curator or producer than author — deciding what's worth
+covering, what's accurate, and what gets cut — not typing every sentence by
+hand.
 
 ## Chapters
 
