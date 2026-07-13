@@ -38,14 +38,14 @@ surface area — not in the sense that it's one coherent thing.
 
 ### Runtime
 
-Runtime is the core: a serverless microVM per session, billed at
-$0.0895 per vCPU-hour and $0.00945 per GB-hour, per-second granularity,
-1-second minimum. That's the same execution model Lambda has used for
-years (Firecracker microVMs), retuned for a workload Lambda handles
-badly — an agent turn that might run for minutes, hold state across tool
-calls, and not fit a 15-minute hard ceiling. If you've ever tried to wedge
-a LangGraph loop into Lambda and hit that ceiling, Runtime is the answer
-to that specific problem, not a new idea.
+Runtime is the core: a serverless microVM per session, metered by actual
+compute time down to the second rather than a fixed instance you keep
+running. That's the same execution model Lambda has used for years
+(Firecracker microVMs), retuned for a workload Lambda handles badly — an
+agent turn that might run for minutes, hold state across tool calls, and
+not fit a 15-minute hard ceiling. If you've ever tried to wedge a
+LangGraph loop into Lambda and hit that ceiling, Runtime is the answer to
+that specific problem, not a new idea.
 
 You still bring your own container. Build a Docker image (ARM64 only —
 build it on x86 and dependencies fail silently at runtime), expose
@@ -97,8 +97,8 @@ Runtime never sees it.
 
 ### Browser
 
-Browser bills at the *exact same* vCPU-hour and GB-hour rates as Runtime.
-That's the tell — it isn't a bespoke product, it's Runtime with a
+Browser is metered exactly the same way as Runtime — same unit, same
+rate. That's the tell — it isn't a bespoke product, it's Runtime with a
 different container image and a product name: a managed headless browser
 (Playwright- and BrowserUse-compatible) with a live view for watching a
 session and a recording for replaying one later. One genuinely specific
@@ -114,8 +114,8 @@ not novel execution technology.
 
 Code Interpreter is the same story again: another container image on the
 same Runtime substrate, this one pre-loaded with Python, JavaScript, and
-TypeScript kernels instead of a browser. Same billing formula, same
-per-session isolation. If Runtime, Browser, and Code Interpreter feel like
+TypeScript kernels instead of a browser. Same metering, same per-session
+isolation. If Runtime, Browser, and Code Interpreter feel like
 three products, that's the packaging talking — underneath they're one
 execution primitive wearing three skins.
 
@@ -150,19 +150,21 @@ idea.
 
 ### Memory
 
-Memory has two tiers, and they're priced differently, which tells you
-what they actually are. Short-term memory is billed per raw event stored
-during a session — a session-scoped event log, nothing more. Long-term
-memory is billed per record processed and stored plus per retrieval call:
-after a session ends, a background job runs one of four built-in
-extraction strategies — semantic (facts), user preference, summary, or
-episodic (behavior over time) — and writes the result as a queryable
-record. That's a managed table plus an LLM-powered extraction step, not a
-new memory architecture. Compare it to the [agent memory](../agent-memory/index.md)
-a coding agent keeps in a flat file on disk: same idea — write notes now,
-read them back later when relevant — except AWS's version runs the
-"decide what's worth remembering" step as a paid, asynchronous call
-instead of the agent just writing a file.
+Memory has two tiers, and they work differently. Short-term memory is
+just a session-scoped event log: every message gets appended, nothing is
+interpreted. Long-term memory is generated from that log after the fact —
+a background job runs one of four built-in extraction strategies
+(semantic facts, user preference, summary, or episodic behavior-over-time)
+and writes the result as a separate, queryable record. So the raw
+conversation and the thing you actually search later aren't the same
+data — the log is input, the extraction step is what produces the
+searchable memory. That's a managed table plus an LLM-powered extraction
+step, not a new memory architecture. Compare it to the
+[agent memory](../agent-memory/index.md) a coding agent keeps in a flat
+file on disk: same idea — write notes now, read them back later when
+relevant — except here "decide what's worth remembering" is a separate,
+asynchronous step AWS runs for you instead of something the agent does
+inline while writing the file.
 
 None of that is wired to the model call, though. Memory is a
 store-and-retrieve API — writing an event and reading memories back are
