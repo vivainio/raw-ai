@@ -27,6 +27,7 @@ nav = [
     { "Skill + CLI instead of MCP" = "agent-skills/skill-vs-mcp.md" },
   ] },
   { "Agent Dialogue" = "agent-dialogue/index.md" },
+  { "Agent Memory" = "agent-memory/index.md" },
 ]
 
 extra_css = ["stylesheets/extra.css"]

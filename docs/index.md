@@ -26,3 +26,6 @@ hand.
 - [Agent Dialogue](agent-dialogue/index.md) — what's actually in the system
   prompt, how a tool call is just a predicted block of JSON, and why asking
   you a question is the same mechanism as running a shell command.
+- [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
+  you and the project between sessions: where the files live, what's in
+  them, and why they're never fully trusted on read.
