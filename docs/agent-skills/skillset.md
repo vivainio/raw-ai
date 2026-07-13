@@ -64,7 +64,7 @@ skills:
     enabled: ["*"]
 
   vivainio/jira-skills:
-    enabled: [bu-jira-process]
+    enabled: [mycompany-jira-process]
     disabled: [experimental-jira-thing]
 ```
 
