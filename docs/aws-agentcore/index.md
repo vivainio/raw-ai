@@ -469,6 +469,39 @@ be a model, not a wholly new idea; the RFC 8693 exchange piece is the
 part that's genuinely specific to bridging an inbound agent call to an
 outbound per-user one.
 
+Mechanically, the agent doesn't call the token vault's API directly — it
+decorates whatever function needs the credential, and the SDK resolves it
+before that function body runs:
+
+```python
+from bedrock_agentcore.identity import requires_access_token
+
+@requires_access_token(
+    provider_name="google-provider",
+    scopes=["https://www.googleapis.com/auth/drive.metadata.readonly"],
+    auth_flow="USER_FEDERATION",
+    on_auth_url=lambda url: print(f"Authorize here: {url}"),
+)
+async def read_drive_file(*, access_token: str):
+    # access_token is already resolved by the time this line runs
+    ...
+```
+
+Underneath that one decorator sit three separate calls the SDK makes on
+your behalf — `CreateWorkloadIdentity`, `GetWorkloadAccessToken`,
+`GetResourceOauth2Token` — none of which the agent code ever touches.
+Which of those calls needs a human depends on `auth_flow`: `M2M` returns
+the access token in one round trip, no user involved, the same shape as
+the API-key case from Gateway's credential providers. `USER_FEDERATION` is
+the three-legged case — the first call comes back with an authorization
+URL instead of a token, the decorator hands that URL to `on_auth_url`
+(print it, stream it into a chat UI, push it to a webhook — whatever the
+app does with a "please consent" link), then polls
+`GetResourceOauth2Token` until the user finishes consenting and a token
+appears. AgentCore stores the provider's refresh token alongside that
+first token and uses it silently on every later call, so the human is only
+in the loop once, not on every downstream request.
+
 ### Memory
 
 Memory has two tiers, and they work differently. Short-term memory is
