@@ -91,14 +91,17 @@ few, paste them into the prompt."
 
 ## Where naive RAG breaks
 
-Everything above runs *before* generation starts, once, unconditionally.
-That's fine for a fixed corpus and a well-worded query, and it falls apart
-the moment either isn't true:
+Everything above runs *before* generation starts, once, unconditionally,
+and application code — not the model — decides the query, the k, and
+whether to search at all. That's fine for a fixed corpus and a
+well-worded query, and it falls apart the moment either isn't true:
 
-- The retrieval happens before the model has said anything, so there's no
-  way to notice "these three chunks don't actually answer this" and go
-  fetch different ones — the model gets one shot at whatever the top-k
-  search returned, wrong or not.
+- There's no checkpoint where the model evaluates what came back. It never
+  gets a turn to notice "these three chunks don't actually answer this"
+  and go fetch different ones — the search result is already baked into
+  the prompt by the time the model produces any output at all, so its only
+  option is to answer with whatever the top-k search returned, wrong or
+  not.
 - A single query embedding can't represent a question that actually needs
   two different lookups — "compare last quarter's revenue to this
   quarter's" is one question and two retrievals.
