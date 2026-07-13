@@ -95,6 +95,35 @@ surface. Everything framework-specific — tool definitions, retries,
 structured output validation — stays exactly as it was outside AgentCore;
 Runtime never sees it.
 
+### Session isolation
+
+"Session-isolated" gets used constantly in AgentCore's docs without ever
+being unpacked, so it's worth pinning down. A session is one continuous
+back-and-forth with an agent, identified by a `runtimeSessionId` the
+caller supplies. The first invocation with a new session ID gets a
+dedicated microVM — its own compute, memory, and filesystem, not shared
+with any other session. Later invocations using that same session ID land
+on that *same* microVM, so whatever the agent process is holding in
+memory is still there — that continuity is what lets a session behave
+like an actual ongoing conversation instead of a stateless request every
+time. The session ends — on 15 minutes of inactivity by default, a hard
+cap of 8 hours, an explicit stop call, or a failed health check — and the
+whole microVM is torn down and its memory wiped. A new session, even for
+the same user calling the same agent, always gets a fresh one.
+
+The point of contrast is Lambda's warm-start model, which also reuses
+execution environments but opaquely, as an efficiency detail you're not
+meant to depend on — a warm container can quietly serve unrelated
+invocations, and there's no caller-facing guarantee about which one lands
+where. AgentCore makes that boundary explicit and load-bearing instead of
+incidental: this session ID always maps to its own VM, no other session
+ever shares it, and teardown is deliberate rather than left to whatever
+the scheduler feels like reusing. That matters more here than it does for
+a typical Lambda function because agent sessions often hold things you
+don't want leaking across users — executed code, browser cookies and
+local storage, accumulated conversation state — where a shared warm
+container would be a real security bug, not just a caching quirk.
+
 ### Browser
 
 Browser is metered exactly the same way as Runtime — same unit, same
