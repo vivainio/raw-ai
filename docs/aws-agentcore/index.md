@@ -540,19 +540,108 @@ path. If you already run an OTel collector, you already have the data;
 what AgentCore adds is the CloudWatch wiring and the trace viewer, not a
 new way of instrumenting anything.
 
+### Harness
+
+Every piece documented so far is something your own agent code calls —
+Runtime hosts that code, and Gateway, Memory, Browser, Code Interpreter,
+and Identity are APIs it reaches into from inside the loop you wrote.
+Harness removes that loop from your code entirely. `CreateHarness` takes a
+model, a system prompt, a tool list, and a memory config as one API call;
+`InvokeHarness` runs whatever loop AWS assembled from that config and
+streams the result back. There's no framework decision to make, because
+the harness *is* one — specifically [Strands Agents](https://strandsagents.com),
+AWS's own open-source agent framework, wired up from your config and run
+inside the same session-isolated Runtime microVM documented above
+(CloudTrail even records harness calls under `AWS::BedrockAgentCore::Runtime`).
+
+```python
+control_client.create_harness(
+    harnessName="research-agent",
+    executionRoleArn=execution_role_arn,
+)
+# poll get_harness until status == "READY", then invoke:
+
+response = data_client.invoke_harness(
+    harnessArn=harness_arn,
+    runtimeSessionId=session_id,
+    messages=[{
+        "role": "user",
+        "content": [{"text": "Research three tropical vacation options under $3k."}],
+    }],
+)
+for event in response["stream"]:
+    if "contentBlockDelta" in event:
+        print(event["contentBlockDelta"]["delta"].get("text", ""), end="")
+```
+
+That's the entire integration surface: no `BedrockAgentCoreApp` wrapper, no
+container to build and push to ECR, no tool-calling loop to write by
+hand — all three of which Runtime still requires. The CLI path
+(`agentcore create`, `agentcore deploy`, `agentcore invoke`) reaches the
+same config and gets a scaffolded project instead of raw API calls, but
+it's the same trade either way.
+
+Which makes pydantic.ai the wrong comparison. Pydantic.ai, like Strands
+itself, LangGraph, or CrewAI, is a library you import and write Python
+against — a real reduction in boilerplate, but you still own the loop and
+ship code that calls it. Harness's fork is a level up from that: code
+versus config. Reach for pydantic.ai and you've already decided to write
+an agent in Python; reach for Harness and you haven't written anything,
+you've filled in a form. The nearer comparison is a hosted agent-builder
+or something like OpenAI's Assistants/Responses API, not another Python
+package.
+
+That config-not-code trade shows up concretely in what's a field versus a
+redeploy. Switching model provider — Bedrock, OpenAI, Gemini, or anything
+LiteLLM-compatible — is a config value, and doing it mid-session without
+losing the conversation is the same field, not a client swap. Attaching an
+AWS Skill from Git, S3, or the curated catalog is a toggle. Wiring in
+Memory, Gateway, Browser, or Code Interpreter is a config block instead of
+the `import` and explicit client calls each of those needed everywhere
+else in this chapter. None of the mechanics underneath change because
+Harness sits in front of them: same session-isolated microVM, same
+actor-scoped memory namespaces, same credential-provider indirection in
+Gateway. There's no separate meter for Harness either — a session bills
+for whatever mix of Runtime, Memory, Gateway, and the rest it actually
+used, same as if you'd called them yourself.
+
+The trade runs out exactly where "no code" has to. There's no choice of
+agent framework — you get Strands, full stop — no bidirectional
+streaming, no non-loop patterns like a graph or workflow, no hooks into
+the loop's internals. AWS's own docs treat that boundary as expected
+rather than a gap to apologize for: export the harness to Strands code
+and keep running it on Runtime once config stops being enough, so the
+managed layer is something you can grow out of instead of a wall you hit.
+
 ## What's actually new here
 
-Cutting through it: two things don't have an obvious pre-existing AWS
-answer. Session-isolated compute built for a *long, stateful* agent turn
-rather than a short stateless function, and Gateway's automatic
-API/Lambda-to-MCP-tool conversion. Identity's workload-identity concept is
-arguably a third, but it's an existing pattern from elsewhere (Kubernetes
-and GCP both already have "workload identity") applied to a new kind of
-caller, not an invention. Everything else on the list — sandboxed code
-execution, a headless browser, a credential broker, a trace pipeline, a
-policy engine — already existed somewhere in AWS or in a third-party
-product; AgentCore's contribution is putting an agent-sized label and a
-per-second meter on each one and shipping them as one console tab.
+The fairer test isn't whether some third party already ships something
+adjacent — Browserbase, E2B, and Mem0 all predate their AgentCore
+counterparts — it's whether AWS itself had an answer before AgentCore
+shipped. On that bar, most of this list clears: Runtime's session-isolated
+long-running compute, Gateway, Memory, Browser, Code Interpreter, and
+Harness are all things AWS is standing up for the first time, not a new
+name on an existing AWS service. Harness is the clearest case — a
+managed, codeless agent loop didn't exist anywhere in AWS's lineup before
+this.
+
+The exceptions are the pieces built on AWS tech that already shipped
+under a different label. Observability's dashboard is new; the pipeline
+underneath — OTel traces into CloudWatch — is the same one AWS already
+ran. Policy reuses Cedar, the engine already behind Verified Permissions,
+for a new question — which tools can this agent call — without a new
+engine underneath. Evaluations/Optimization extends Bedrock's existing
+model-evaluation tooling to score agent traces instead of raw model
+outputs — same capability, a wider target. Identity sits in between: the
+workload-identity primitive is new for AWS, but the pattern isn't new
+anywhere — Kubernetes and GCP already had "workload identity" — so this
+is AWS filling a gap in its own platform rather than inventing the idea.
+
+That leaves a different verdict than "AWS relabeled a pile of existing
+services": a few pieces genuinely are that, but most of AgentCore is AWS
+building an agent stack it simply didn't have, one piece at a time,
+priced and documented as a dozen separate line items rather than shipped
+as one coherent idea.
 
 ## What you're actually paying for
 
