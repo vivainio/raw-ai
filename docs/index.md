@@ -51,6 +51,10 @@ directory names and file formats, not the shape of the thing.
 - [RAG](rag/index.md) — retrieval-augmented generation stripped down to
   what it actually is: chunk, embed, search — and why an agent should call
   that search as a tool instead of running it once before its first turn.
+- [Prompt Caching](llm-caching/index.md) — why a cache is a prefix match,
+  not a lookup table: breakpoint placement, the write/read cost tradeoff,
+  and the silent invalidators that quietly turn a cached agent back into
+  an uncached one.
 - [Hosting: AWS Bedrock](aws-bedrock/index.md) — the model-hosting layer
   underneath AgentCore, Strands, and Pydantic AI: one API across
   providers, plus Guardrails, Knowledge Bases, and the classic Agents

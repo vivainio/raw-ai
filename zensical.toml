@@ -29,11 +29,13 @@ nav = [
   { "Agent Dialogue" = "agent-dialogue/index.md" },
   { "Agent Memory" = "agent-memory/index.md" },
   { "RAG" = "rag/index.md" },
+  { "Prompt Caching" = "llm-caching/index.md" },
   { "Hosting: AWS Bedrock" = "aws-bedrock/index.md" },
   { "Hosting: AWS AgentCore" = "aws-agentcore/index.md" },
   { "Frameworks: Pydantic AI" = "pydantic-ai/index.md" },
   { "Frameworks: Strands Agents" = "strands-agents/index.md" },
   { "Frameworks: Microsoft Agent Framework" = "microsoft-agent-framework/index.md" },
+  { "Frameworks: Rolling Your Own" = "rolling-your-own/index.md" },
   { "The OpenAI API" = "openai-api/index.md" },
 ]
 
