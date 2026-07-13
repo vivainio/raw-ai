@@ -469,6 +469,19 @@ be a model, not a wholly new idea; the RFC 8693 exchange piece is the
 part that's genuinely specific to bridging an inbound agent call to an
 outbound per-user one.
 
+None of what follows is worth worrying about if the backend you're calling
+doesn't speak OAuth in the first place. A downstream API that only takes a
+static key skips all of it — that's the API-key credential provider from
+Gateway, a straight secret fetch with no discovery document, no grant
+type, no consent flow. The token vault's OAuth2 machinery only matters
+once the backend is itself a real OAuth2/OIDC authorization server, and
+even then it's tiered: plain client-credentials (`M2M`) or user
+authorization-code (`USER_FEDERATION`) is what most OAuth2 implementers
+ship, while on-behalf-of token exchange (RFC 8693) is a narrower ask
+plenty of providers never implement — without it, per-user delegation
+falls back to running the full consent flow separately for every user
+rather than the single-exchange shortcut.
+
 Mechanically, the agent doesn't call the token vault's API directly — it
 decorates whatever function needs the credential, and the SDK resolves it
 before that function body runs:
