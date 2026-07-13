@@ -162,6 +162,55 @@ isolation. If Runtime, Browser, and Code Interpreter feel like
 three products, that's the packaging talking — underneath they're one
 execution primitive wearing three skins.
 
+It's easy to conflate this with Runtime itself, so it's worth separating
+what each one holds. Runtime hosts *your* code — the agent process you
+wrote and deployed. Code Interpreter is a separate sandbox your agent
+calls into as a tool, specifically for running code the *model* just
+generated, that you don't want anywhere near the process holding your
+agent's own state and credentials:
+
+```python
+from bedrock_agentcore.tools.code_interpreter_client import CodeInterpreter
+
+code_client = CodeInterpreter("us-west-2")
+code_client.start()
+response = code_client.invoke("executeCode", {
+    "language": "python",
+    "code": "print(2 + 2)",
+})
+code_client.stop()
+```
+
+The model produces a code string, the tool handler ships it to a Code
+Interpreter session, and whatever comes back on stdout is what the model
+sees as the tool result — the same shape as a coding agent's own
+bash/Python execution, except the sandbox is a rented AWS resource behind
+an API call rather than a subprocess on the same machine.
+
+It's also a separate disk, not a shared mount with the Runtime container
+that invoked it. A file your agent process can see isn't automatically
+visible to code running inside a Code Interpreter session — moving
+something across that boundary is an explicit `writeFiles` /
+`readFiles` call, same as it would be with any remote sandbox:
+
+```python
+# push a file into the sandbox
+code_client.invoke("writeFiles", {
+    "content": [{"path": "data.csv", "text": "a,b\n1,2\n3,4\n"}]
+})
+
+# run code that reads it from the sandbox's own disk
+code_client.invoke("executeCode", {
+    "language": "python",
+    "code": "print(open('data.csv').read())",
+})
+```
+
+Nothing is shared implicitly. Every hop across the boundary — file in,
+result out — is a call your code makes on purpose, the same pattern as
+Memory's `create_event`/`retrieve_memories` pair: two separate stores,
+and you're the one wiring the pipe between them.
+
 ### Gateway
 
 Gateway is the one piece here that saves real work. Point it at an
