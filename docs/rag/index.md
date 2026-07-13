@@ -89,39 +89,14 @@ doesn't have to run against millions of chunks on every query. Nothing
 else about the shape changes — it's still "embed, compare, keep the top
 few, paste them into the prompt."
 
-## Where naive RAG breaks
-
-Everything above runs *before* generation starts, once, unconditionally,
-and application code — not the model — decides the query, the k, and
-whether to search at all. That's fine for a fixed corpus and a
-well-worded query, and it falls apart the moment either isn't true:
-
-- There's no checkpoint where the model evaluates what came back. It never
-  gets a turn to notice "these three chunks don't actually answer this"
-  and go fetch different ones — the search result is already baked into
-  the prompt by the time the model produces any output at all, so its only
-  option is to answer with whatever the top-k search returned, wrong or
-  not.
-- A single query embedding can't represent a question that actually needs
-  two different lookups — "compare last quarter's revenue to this
-  quarter's" is one question and two retrievals.
-- Every answer pays for retrieval whether it's needed or not. "What's 2+2"
-  gets the same chunk-stuffing treatment as a question that genuinely
-  depends on the corpus.
-
-The fix for all three is the same: stop running retrieval once, before
-generation starts, with no way back. Make it a tool call the model can
-invoke, inspect the result of, and invoke again — inside the loop, not in
-front of it.
-
-## Integrating with an agent: retrieval as a tool call
+## As a tool call
 
 The [Agent Dialogue](../agent-dialogue/index.md) chapter covers the actual
 mechanism a coding agent uses to run a shell command: the model predicts a
 `tool_use` block, the harness executes it for real, the result comes back
-as a `tool_result` in the next message. Retrieval fits that same shape
-exactly — a search function with a name, a description, and a schema,
-callable mid-conversation instead of pre-run before it:
+as a `tool_result` in the next message. Retrieval works the same way —
+wrap `retrieve()` in a tool definition and the model calls it exactly like
+it would call `Bash` or `Read`:
 
 ```python
 search_docs_tool = {
@@ -145,29 +120,50 @@ call it again with a different query if the first batch of chunks didn't
 answer the question. A `tool_result` full of retrieved passages isn't
 structurally different from a `tool_result` full of `ls` output; the model
 reads it, decides if it's enough, and either answers or asks for more.
-That's the entire upgrade from "naive RAG" to what's usually called
-agentic RAG: nothing new gets added to the protocol, retrieval just moves
-from a preprocessing step outside the loop to a tool call inside it.
 
-The practical differences follow directly from that move:
+That gets you:
 
 - **Cost is conditional.** A question the model can already answer, or one
   that doesn't touch the corpus at all, skips the tool call entirely
   instead of always paying for a retrieval it doesn't need.
-- **Multi-hop questions work.** "Compare X and Y" can become two `search_docs`
-  calls with two different queries in the same turn, each returning its own
-  chunks, instead of one query embedding trying to represent both halves at
-  once.
-- **A bad first retrieval is recoverable.** If the returned chunks don't
-  answer the question, the model can reformulate the query and call the
-  tool again — something a pre-loop retrieval step has no mechanism to do,
-  since by the time it would notice, generation has already started.
-- **The tool implementation still does the real work.** Chunking, embedding,
-  the similarity search, any reranking — none of that goes away or gets
-  simpler. Making retrieval agentic changes *when* it's invoked and by
-  *whom*, not what happens inside `search_docs` itself.
+- **Multi-hop questions work.** "Compare X and Y" can become two
+  `search_docs` calls with two different queries in the same turn, each
+  returning its own chunks, instead of one query embedding trying to
+  represent both halves at once.
+- **A bad retrieval is recoverable.** If the returned chunks don't answer
+  the question, the model can reformulate the query and call the tool
+  again.
 
-The corpus-search half of RAG is unglamorous information retrieval, done
-the same way whether an agent is involved or not. The "agentic" half is
-just an ordinary tool-use loop, the same one driving every shell command
-in this book, pointed at a search function instead of a filesystem.
+The tool is doing the exact same work as the code in the last section —
+chunking, embedding, the similarity search, any reranking. What changes is
+*who* decides when it runs and with what query: the model, mid-conversation,
+instead of your code, once, up front.
+
+## The one-shot alternative
+
+Sometimes there's no loop to put the tool call inside — a single-turn
+summarization endpoint, a classification pipeline, anything that isn't
+running an agent at all. Retrieval still has a place there: call
+`retrieve()` yourself, once, before the model's only turn, and paste the
+result straight into the prompt, the way the code example two sections
+back did.
+
+The cost of skipping the tool call is that the model never gets a chance
+to react to what came back:
+
+- Application code — not the model — decides the query, the k, and
+  whether to search at all, and that decision is locked in before the
+  model produces any output. If the search ranked the wrong chunks
+  highest, there's no recovery; the model answers with whatever it got,
+  right or wrong.
+- A single query embedding can't represent a question that needs two
+  different lookups — "compare last quarter's revenue to this quarter's"
+  is one question and two retrievals, and a one-shot search only gets one.
+- Every call pays for retrieval whether the question needs it or not —
+  there's no cheap "skip it" path when nothing's deciding whether to
+  search in the first place.
+
+That's a real tradeoff, not a mistake — worth taking when the corpus is
+narrow enough that a wrong top-k is unlikely, or when there's no agent
+loop to hand the decision to in the first place. Outside those cases, the
+tool call is the one worth reaching for by default.
