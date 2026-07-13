@@ -4,20 +4,37 @@ icon: lucide/search
 
 # RAG
 
-RAG — retrieval-augmented generation — means putting text into the prompt
-that wasn't there when the model was trained, fetched from somewhere at the
-moment of answering rather than baked into the weights. The name makes it
-sound like a technique. It's really just two ordinary things stapled
-together: a search step, and a generation step that gets to read the search
-results before it writes anything.
+Start from something already familiar: full-text search. Grep the corpus,
+or run it through Postgres's `tsvector`, and paste the matching lines into
+the prompt — that's already retrieval-augmented generation, in the literal
+sense of "text fetched at answer time instead of baked into the weights."
+What's usually meant by "RAG" adds exactly one idea on top of that: instead
+of matching shared *words*, the search step matches shared *meaning*, via
+embeddings, so a query and a chunk that share no vocabulary at all can
+still be found relevant.
 
-The reason it exists at all: a model's parametric knowledge is frozen at
-training time, can't be updated without retraining, and never contained
-your private documents, your company's internal wiki, or last week's
-support tickets in the first place. Retrieval sidesteps all three problems
-by not asking the model to *know* the answer — only to *read* it, the same
-way you'd hand a colleague the right page instead of expecting them to have
-memorized the manual.
+That gap is the whole value proposition. Most real queries don't share
+words with the answer — "how do I get my money back" doesn't contain
+"refund," and a support ticket describing a bug rarely uses the phrasing
+of the changelog entry that fixed it. `grep "money back"` returns nothing;
+a full-text index gets partial credit if stemming happens to line up; an
+embedding of the query lands close to the embedding of the refund-policy
+chunk regardless of phrasing, because it's comparing meaning instead of
+tokens.
+
+It's also the whole limitation, in reverse: embeddings are worse than grep
+at anything exact. An error code, a function name, a SKU — grep finds
+those instantly and for free, and a similarity search can bury an exact
+match under a pile of "semantically close" noise instead of surfacing it
+first. That asymmetry is why systems that actually ship rarely pick one or
+the other — lexical search (BM25, Postgres full-text, plain grep) and
+vector search run side by side, results merged or reranked, so exact terms
+don't lose to paraphrases and paraphrases don't lose to exact terms.
+
+The rest of this chapter covers the embedding half — the part full-text
+search doesn't already give you — and how to wire retrieval, of either
+kind, into an agent's tool-call loop instead of running it once before
+generation starts.
 
 ## How to write one
 
