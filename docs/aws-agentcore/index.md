@@ -429,6 +429,75 @@ with one less service to operate. Gateway earns its keep specifically
 when the tool count or the credential-isolation requirement gets large
 enough that those two gaps start to matter.
 
+### Policy
+
+Policy is scoped narrower than its name suggests: it governs one specific
+boundary, every tool call that passes through an AgentCore Gateway, not
+agent behavior in general. Attach a policy engine to a gateway and every
+`tools/call` request gets intercepted and evaluated before it reaches the
+backend; nothing about Runtime's own code, Browser's page actions, or
+Code Interpreter's execution goes through it unless that call happens to
+be routed through a gateway target.
+
+Policies are written in [Cedar](https://www.cedarpolicy.com/en), the same
+open-source policy language behind AWS Verified Permissions — `permit` or
+`forbid`, scoped to a principal/action/resource triple, with an optional
+`when`/`unless` condition:
+
+```
+permit(
+  principal is AgentCore::OAuthUser,
+  action == AgentCore::Action::"RefundTarget___process_refund",
+  resource == AgentCore::Gateway::"arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/refund-gateway"
+)
+when {
+  principal.hasTag("username") &&
+  principal.getTag("username") == "John" &&
+  context.input.amount < 500
+};
+```
+
+Everything left unmatched is denied — the engine defaults to deny, and
+evaluation is forbid-wins: any matching `forbid` overrides every matching
+`permit`, and a request with no matching policy at all is denied the same
+as one explicitly forbidden. Nothing here is novel evaluation logic; it's
+the same algorithm Verified Permissions already runs.
+
+What's specific to Gateway is where `principal`, `action`, and `resource`
+actually come from. The principal isn't something you model yourself —
+it's derived from whichever inbound auth the gateway already has
+configured: `AgentCore::OAuthUser` built from a JWT's `sub` claim (with
+JWT claims like `username`, `scope`, or `role` exposed as tags a condition
+can read, the same JWT authorizer documented in Gateway above), or
+`AgentCore::IamEntity` built from the caller's assumed-role ARN when the
+gateway uses IAM auth instead. The action vocabulary isn't hand-defined
+either — the policy engine auto-generates a Cedar schema straight from
+each target's tool definitions, so `RefundTarget___process_refund` and its
+`amount` parameter exist as a typed Cedar action purely because that's
+what the Lambda target's tool schema already declared. That's a real
+difference from IAM: an IAM action is a fixed operation off AWS's own API
+surface (`s3:GetObject`, `lambda:InvokeFunction`), the same handful of
+verbs across every account. A Cedar action here is whatever your OpenAPI
+spec or Lambda schema happens to name a tool, different in every gateway,
+generated fresh from a schema AWS never wrote.
+
+```bash
+agentcore add policy-engine --name RefundPolicyEngine \
+  --attach-to-gateways PolicyGateway --attach-mode ENFORCE
+agentcore add policy --name RefundLimit \
+  --engine RefundPolicyEngine --source refund_policy.cedar
+```
+
+The one AWS-specific addition on top of plain Cedar is the authoring and
+validation layer, not the enforcement engine. Hand-writing Cedar is
+optional — `agentcore add policy --generate "Only allow refunds under
+1000 dollars"` runs a natural-language request through a policy-authoring
+service that emits Cedar, checks it against the auto-generated schema, and
+runs automated reasoning over it looking specifically for a policy that
+always allows (no condition actually restricts anything) or always denies
+(a `forbid` with no exceptions) — catching a rule that looks like it does
+something but doesn't, before it ever reaches production.
+
 ### Identity
 
 Start with the obvious question: an agent already runs under an IAM role —
