@@ -56,6 +56,12 @@ in your own terminal to see exactly what it saw.
 - **No process to manage.** zaira reads credentials straight from the OS
   keyring (Keychain, Secret Service, Credential Manager). There's no MCP
   server to start, authenticate, and keep alive alongside the agent.
+- **No idle bloat.** Each configured MCP server is a process — often a `node`
+  process, sometimes a whole Docker container — that starts with your editor
+  or agent session and sits there whether you use it that day or not. Add a
+  server per integration and you accumulate a pile of these, memory and CPU
+  spent on tools nobody's calling. A CLI only runs while a command is
+  actually executing.
 - **One tool, two users.** The CLI a human runs by hand is the exact CLI the
   agent runs. Nothing agent-only to keep working.
 
