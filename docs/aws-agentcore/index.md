@@ -36,7 +36,9 @@ surface area — not in the sense that it's one coherent thing.
 
 ## The load-bearing pieces, taken apart
 
-**Runtime** is the core: a serverless microVM per session, billed at
+### Runtime
+
+Runtime is the core: a serverless microVM per session, billed at
 $0.0895 per vCPU-hour and $0.00945 per GB-hour, per-second granularity,
 1-second minimum. That's the same execution model Lambda has used for
 years (Firecracker microVMs), retuned for a workload Lambda handles
@@ -93,47 +95,96 @@ surface. Everything framework-specific — tool definitions, retries,
 structured output validation — stays exactly as it was outside AgentCore;
 Runtime never sees it.
 
-**Browser** and **Code Interpreter** bill at the *exact same* vCPU-hour
-and GB-hour rates as Runtime. That's the tell — they're not bespoke
-products, they're Runtime with a different container image and a product
-name, competing directly with things like Browserbase, E2B, or
-Cloudflare's Sandbox SDK. The pitch is the managed sandbox and the AWS IAM
-boundary around it, not novel execution technology.
+### Browser
 
-**Gateway** is the one piece that saves real work: point it at an OpenAPI
-spec or a Lambda function and it generates an MCP-compatible tool
-endpoint, with auth, without you writing a tool wrapper by hand. If you
-were going to hand-roll "expose fifteen internal APIs to an agent as
-tools," Gateway is a genuine shortcut, not a rebrand.
+Browser bills at the *exact same* vCPU-hour and GB-hour rates as Runtime.
+That's the tell — it isn't a bespoke product, it's Runtime with a
+different container image and a product name: a managed headless browser
+(Playwright- and BrowserUse-compatible) with a live view for watching a
+session and a recording for replaying one later. One genuinely specific
+feature sits on top: it can cryptographically sign outbound HTTP requests
+so a site sees a legitimate, attributable client instead of generic
+headless-Chrome traffic, which cuts down on CAPTCHA challenges. Everything
+else about it — the sandbox, the isolation, the metering — is Runtime.
+It competes directly with Browserbase, E2B, or Cloudflare's Sandbox SDK,
+and the pitch is the managed sandbox plus the AWS IAM boundary around it,
+not novel execution technology.
 
-**Identity** doesn't replace Cognito, Okta, or Auth0 — it sits in front of
-them as a credential broker, handing agents scoped, short-lived tokens
-instead of static API keys. Useful, but it's the same job STS already
-does for humans, extended to cover a caller that happens to be a model.
+### Code Interpreter
 
-**Memory** is priced per raw event (short-term) and per processed/stored
-record plus retrieval call (long-term) — which is to say, a managed table
-plus an extraction step, not a new memory architecture. Compare it to the
-[agent memory](../agent-memory/index.md) a coding agent keeps in a flat
-file on disk: same idea, AWS's version just charges per write and per
-read.
+Code Interpreter is the same story again: another container image on the
+same Runtime substrate, this one pre-loaded with Python, JavaScript, and
+TypeScript kernels instead of a browser. Same billing formula, same
+per-session isolation. If Runtime, Browser, and Code Interpreter feel like
+three products, that's the packaging talking — underneath they're one
+execution primitive wearing three skins.
 
-**Observability** is OpenTelemetry traces landing in CloudWatch. If you
-already run an OTel collector, you already have this; AgentCore's version
-just wires it to CloudWatch by default and adds an agent-shaped UI on top
-of the trace data.
+### Gateway
+
+Gateway is the one piece here that saves real work. Point it at an
+OpenAPI spec or a Lambda function and it generates an MCP-compatible tool
+endpoint — with inbound and outbound auth wired in — without you writing a
+tool wrapper by hand. It also does semantic and keyword search over the
+tools it exposes, so an agent with access to hundreds of tools doesn't
+need all of their descriptions stuffed into context just to pick the
+right one. If you were going to hand-roll "expose fifteen internal APIs
+to an agent as tools," Gateway is a genuine shortcut, not a rebrand.
+
+### Identity
+
+Identity doesn't replace Cognito, Okta, or Auth0 — your users still
+authenticate through whichever of those you already run. What it adds is
+a **workload identity**: a new identity primitive, distinct from any IAM
+role or Cognito user, that represents the agent itself and gets its own
+ARN. Inbound Auth checks who's allowed to call the agent (IAM or an OAuth
+JWT); Outbound Auth is what the agent presents to reach *other* things on
+the caller's behalf — via a token vault that supports user-delegated
+access (OAuth authorization-code grant), service-to-service calls (client
+credentials grant), and on-behalf-of token exchange, so an agent can act
+for an authenticated user against a downstream API without re-prompting
+for consent. That last piece is a real, if narrow, addition — most clouds
+already have a "workload identity" concept for service-to-service calls
+(Kubernetes and GCP both ship one), and AgentCore's version is that
+pattern extended to a caller that happens to be a model, not a wholly new
+idea.
+
+### Memory
+
+Memory has two tiers, and they're priced differently, which tells you
+what they actually are. Short-term memory is billed per raw event stored
+during a session — a session-scoped event log, nothing more. Long-term
+memory is billed per record processed and stored plus per retrieval call:
+after a session ends, a background job runs one of four built-in
+extraction strategies — semantic (facts), user preference, summary, or
+episodic (behavior over time) — and writes the result as a queryable
+record. That's a managed table plus an LLM-powered extraction step, not a
+new memory architecture. Compare it to the [agent memory](../agent-memory/index.md)
+a coding agent keeps in a flat file on disk: same idea — write notes now,
+read them back later when relevant — except AWS's version runs the
+"decide what's worth remembering" step as a paid, asynchronous call
+instead of the agent just writing a file.
+
+### Observability
+
+Observability is OpenTelemetry traces landing in CloudWatch, with a
+GenAI-specific dashboard on top for stepping through an agent's execution
+path. If you already run an OTel collector, you already have the data;
+what AgentCore adds is the CloudWatch wiring and the trace viewer, not a
+new way of instrumenting anything.
 
 ## What's actually new here
 
 Cutting through it: two things don't have an obvious pre-existing AWS
 answer. Session-isolated compute built for a *long, stateful* agent turn
 rather than a short stateless function, and Gateway's automatic
-API/Lambda-to-MCP-tool conversion. Everything else on the list — sandboxed
-code execution, a headless browser, a credential broker, a trace
-pipeline, a policy engine — already existed somewhere in AWS or in a
-third-party product; AgentCore's contribution is putting an agent-sized
-label and a per-second meter on each one and shipping them as one console
-tab.
+API/Lambda-to-MCP-tool conversion. Identity's workload-identity concept is
+arguably a third, but it's an existing pattern from elsewhere (Kubernetes
+and GCP both already have "workload identity") applied to a new kind of
+caller, not an invention. Everything else on the list — sandboxed code
+execution, a headless browser, a credential broker, a trace pipeline, a
+policy engine — already existed somewhere in AWS or in a third-party
+product; AgentCore's contribution is putting an agent-sized label and a
+per-second meter on each one and shipping them as one console tab.
 
 ## What you're actually paying for
 
