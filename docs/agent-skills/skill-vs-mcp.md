@@ -68,6 +68,11 @@ needs.
 - **No process to manage.** zaira reads credentials straight from the OS
   keyring (Keychain, Secret Service, Credential Manager). There's no MCP
   server to start, authenticate, and keep alive alongside the agent.
+- **You're not stuck with someone else's bugs.** A third-party MCP server is
+  someone else's implementation — if a tool call is broken, slow, or missing
+  a flag you need, you're filing an issue and waiting. A CLI is a dependency
+  you can actually patch: fork it, fix the bug, add the flag, PR it upstream
+  if you want, and move on.
 - **No idle bloat.** Each configured MCP server is a process — often a `node`
   process, sometimes a whole Docker container — that starts with your editor
   or agent session and sits there whether you use it that day or not. Add a
