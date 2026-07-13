@@ -149,6 +149,72 @@ resumability is real, but the Temporal cluster or the DBOS-configured
 Postgres instance backing it is infrastructure you stand up and run, not
 a service AWS bills you for by the second.
 
+## Pausing without a workflow engine: deferred tools
+
+There's a third option between "no persistence" and "wrap it in
+Temporal/DBOS": pause the run itself and hand the unfinished state to
+whoever's easiest to trust with it, no workflow engine involved. Two
+mechanisms share this shape. A tool that needs a human to sign off raises
+`ApprovalRequired` (or is declared with
+`@agent.tool_plain(requires_approval=True)`); a tool whose work has to
+happen somewhere else entirely — a background job, another service —
+raises `CallDeferred` instead. Either way the run doesn't error out, it
+ends early and returns a `DeferredToolRequests` as its output:
+
+```python
+from pydantic_ai import (
+    Agent, ApprovalRequired, DeferredToolRequests, DeferredToolResults, RunContext,
+)
+
+agent = Agent("openai:gpt-5.2", output_type=[str, DeferredToolRequests])
+
+@agent.tool
+def delete_file(ctx: RunContext, path: str) -> str:
+    if not ctx.tool_call_approved:
+        raise ApprovalRequired
+    return f"deleted {path}"
+
+result = agent.run_sync("Delete config.yaml")
+messages = result.all_messages()
+assert isinstance(result.output, DeferredToolRequests)
+pending = result.output  # .approvals holds the ToolCallPart(s) waiting on a human
+```
+
+`DeferredToolRequests` carries `.calls` (paired with `CallDeferred`, for
+work executed elsewhere) and `.approvals` (paired with
+`ApprovalRequired`/`requires_approval`, for a human decision) as separate
+lists, since "someone needs to click yes" and "a background task hasn't
+finished yet" are different reasons to pause. Resuming means sending back
+a `DeferredToolResults`, keyed by the same `tool_call_id`s, alongside the
+message history the first call produced:
+
+```python
+results = DeferredToolResults()
+results.approvals[pending.approvals[0].tool_call_id] = True  # or ToolDenied("reason")
+result = agent.run_sync(message_history=messages, deferred_tool_results=results)
+```
+
+The framework has no opinion on who holds `messages` and `results`
+between those two calls, or for how long. If both calls happen seconds
+apart in the same process, nothing ever leaves memory. If a human needs
+minutes to approve a deletion, the natural place to put that state is
+wherever the human is already looking — a frontend that's already
+rendering the conversation serializes `messages`
+(`ModelMessagesTypeAdapter.dump_python`) into whatever payload it sends
+on the next request, and the server goes back to holding nothing between
+calls.
+
+That's a genuinely different answer to "how do you not lose an in-flight
+run" than `TemporalAgent`/`DBOSAgent` above. Those checkpoint every step
+server-side, so a crash resumes on its own without the caller doing
+anything. Deferred tools checkpoint nothing — they hand the entire
+unfinished run to whichever caller is on the other end and trust that
+caller to bring it back intact. That's cheaper (no workflow engine, no
+Postgres, no cluster to operate) and it fits naturally behind a stateless
+server that treats every request as independent, but the state only
+survives as long as whatever's holding `messages` does — lose that copy
+before the human responds, and there's nothing left to resume from.
+
 ## Where this sits relative to the platform frameworks
 
 The [AWS AgentCore](../aws-agentcore/index.md) chapter names pydantic.ai
