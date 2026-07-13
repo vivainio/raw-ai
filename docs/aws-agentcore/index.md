@@ -215,6 +215,22 @@ raw log and the thing you query — and that gap isn't specific to AWS;
 it's the same gap any RAG-over-conversation-history setup has to close,
 however it's built.
 
+Isolation between users is `actor_id`-scoped, and the granularity is
+whatever namespace template you write, not something fixed. `/actor/{actorId}/`
+persists across all of that user's sessions — where semantic facts and
+preferences live, since "prefers window seats" shouldn't reset every
+conversation — while `/actor/{actorId}/session/{sessionId}/` scopes a
+summary to one conversation. Nothing stops a coarser namespace either;
+`actor_id` is just a string your code supplies, not a fixed identity
+primitive, so a shared `/team/{teamId}/` namespace works exactly the same
+way. Two things worth knowing about that string, though: AWS never
+derives it from anything — it isn't wired to Identity's workload
+identity or to Cognito, so the isolation guarantee is only as good as
+your own code's discipline about which value it passes as `actor_id`. And
+IAM can enforce the boundary rather than just assume it — actor, session,
+and namespace can all be used as context keys in a policy, so a runtime
+can be restricted to only ever touch its own actor's data.
+
 ### Observability
 
 Observability is OpenTelemetry traces landing in CloudWatch, with a
