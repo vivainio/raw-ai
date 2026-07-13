@@ -23,3 +23,6 @@ hand.
   one skill set across tools, managing skill repos with
   [skillset](https://github.com/vivainio/skillset), and when a CLI plus a
   skill beats an MCP server.
+- [Agent Dialogue](agent-dialogue/index.md) — what's actually in the system
+  prompt, how a tool call is just a predicted block of JSON, and why asking
+  you a question is the same mechanism as running a shell command.

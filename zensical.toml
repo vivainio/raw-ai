@@ -26,6 +26,7 @@ nav = [
     { "Managing skills with skillset" = "agent-skills/skillset.md" },
     { "Skill + CLI instead of MCP" = "agent-skills/skill-vs-mcp.md" },
   ] },
+  { "Agent Dialogue" = "agent-dialogue/index.md" },
 ]
 
 extra_css = ["stylesheets/extra.css"]
