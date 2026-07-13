@@ -206,10 +206,28 @@ code_client.invoke("executeCode", {
 })
 ```
 
-Nothing is shared implicitly. Every hop across the boundary — file in,
-result out — is a call your code makes on purpose, the same pattern as
-Memory's `create_event`/`retrieve_memories` pair: two separate stores,
-and you're the one wiring the pipe between them.
+That `print()` is why the last call needed nothing further: stdout rides
+back on the same response that ran the code, as part of the `executeCode`
+result — `event["result"]["content"]` holds it, no separate fetch
+required. A file the code *writes to disk* instead of printing is a
+different case — that never appears in the `executeCode` response at
+all, since it stayed on the sandbox's filesystem. Getting it out is the
+same explicit pull `writeFiles` needed on the way in:
+
+```python
+code_client.invoke("executeCode", {
+    "language": "python",
+    "code": "open('out.csv', 'w').write('x,y\n1,2\n')",
+})
+code_client.invoke("readFiles", {"paths": ["out.csv"]})
+```
+
+So: printed output comes back for free with the call that produced it;
+anything written to disk needs its own `readFiles`, same as it needed its
+own `writeFiles` going in. Nothing is shared implicitly either way —
+every hop across the boundary is a call your code makes on purpose, the
+same pattern as Memory's `create_event`/`retrieve_memories` pair: two
+separate stores, and you're the one wiring the pipe between them.
 
 ### Gateway
 
