@@ -167,3 +167,57 @@ That's a real tradeoff, not a mistake — worth taking when the corpus is
 narrow enough that a wrong top-k is unlikely, or when there's no agent
 loop to hand the decision to in the first place. Outside those cases, the
 tool call is the one worth reaching for by default.
+
+## RAG over code
+
+Everything above assumed an English corpus. Code raises a real question:
+does a function need an explicit English explanation sitting next to it
+before embedding search can find it at all?
+
+Not strictly — but the reason raw code embeds at all is worth being
+precise about. Embedding models, code-specific ones included, are trained
+on huge amounts of paired code and text: a docstring above a function, a
+README next to the source it describes, a Stack Overflow answer next to
+the snippet it explains, a commit message next to its diff. That pairing
+is what teaches the model a code↔English correspondence during
+training — tokens placed near tokens they co-occurred with millions of
+times, learned statistically, not the model executing or reasoning about
+what the code does.
+
+Which means that correspondence is carried almost entirely by the code's
+own naming and comments, not its syntax. `def apply_discount(price,
+cost): return price * 0.9 - cost` embeds close to a query like "how do we
+calculate discounts," because `apply_discount`, `price`, and `cost` are
+exactly the tokens that co-occurred with discount-related English during
+training. `def f(a, b): return a * 0.9 - b` runs the identical
+computation and embeds close to nothing useful, since the model has only
+generic arithmetic tokens to go on. Undocumented, badly-named code hits
+the same vocabulary-mismatch wall as the refund example at the top of
+this chapter — there's no natural-language signal in the chunk for
+meaning-based search to find, whatever the code actually does.
+
+Two fixes exist for code too terse to carry that signal on its own:
+generate a synthetic one-line summary per function at index time — an
+LLM writes it, not a human — and embed the summary instead of the raw
+code; or use an embedding model trained specifically for code↔NL
+alignment rather than a general text embedding model, since it learned
+that correspondence more thoroughly to begin with.
+
+In practice, most of that apparatus gets skipped for code specifically,
+and the reason is the agentic-search point from earlier applied at full
+strength: if the model does the searching itself, it can try several
+keyword phrasings — a function name it suspects, then a related error
+string, then an import — the same way a person would grep by hand,
+without needing an embedding space to already know those terms are
+related. Code queries usually already share a literal token with the
+target, which favors lexical search outright. This isn't theoretical for
+this book: Claude Code, the tool writing it, searches codebases with a
+`Grep` tool, not an embedding index. Asked where refunds are handled, the
+model doesn't run a similarity search over a vector store — it tries
+`grep -ri refund`, and if that comes up empty, tries `reimburs`, or
+`credit.*back`, reformulating by retry the same way the tool-call section
+above described, just pointed at source instead of a document corpus.
+The corpus is small enough and the queries lexical enough that the
+tool-call loop wins outright, and whatever docstring a human already
+wrote for their own benefit does double duty as the retrieval signal —
+no separate embedding pipeline required.
