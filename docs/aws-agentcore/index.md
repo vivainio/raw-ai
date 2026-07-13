@@ -431,21 +431,43 @@ enough that those two gaps start to matter.
 
 ### Identity
 
-Identity doesn't replace Cognito, Okta, or Auth0 — your users still
-authenticate through whichever of those you already run. What it adds is
-a **workload identity**: a new identity primitive, distinct from any IAM
-role or Cognito user, that represents the agent itself and gets its own
-ARN. Inbound Auth checks who's allowed to call the agent (IAM or an OAuth
-JWT); Outbound Auth is what the agent presents to reach *other* things on
-the caller's behalf — via a token vault that supports user-delegated
-access (OAuth authorization-code grant), service-to-service calls (client
-credentials grant), and on-behalf-of token exchange, so an agent can act
-for an authenticated user against a downstream API without re-prompting
-for consent. That last piece is a real, if narrow, addition — most clouds
-already have a "workload identity" concept for service-to-service calls
-(Kubernetes and GCP both ship one), and AgentCore's version is that
-pattern extended to a caller that happens to be a model, not a wholly new
-idea.
+Start with the obvious question: an agent already runs under an IAM role —
+Runtime's execution role, no different from any Lambda function's. Why
+does AgentCore need a separate identity piece at all? Because IAM's reach
+stops at the AWS boundary. Every permission an IAM policy grants is
+scoped to an AWS resource — a bucket, a table, another function —
+evaluated by AWS's own policy engine against AWS's own resource ARNs. The
+moment an agent needs to call something outside AWS-hosted services — a
+third-party SaaS API, a customer's OAuth-protected endpoint — there's no
+policy grammar for that at all: no way to express "attach this OAuth
+token" or "act as this specific end user downstream." Identity exists to
+cover exactly that territory, not to extend or replace IAM inside the
+boundary IAM already governs.
+
+Inbound auth — who's allowed to call the agent in the first place — stays
+inside the boundary IAM already covers: SigV4 or an OAuth JWT gates the
+call the same way IAM or a JWT authorizer gates any other API. Outbound
+auth is the new territory, and it's where a **workload identity** shows
+up: a primitive distinct from any IAM role or Cognito user, representing
+the agent itself as a caller with its own ARN, holding a token vault for
+reaching things outside AWS. That vault covers three shapes — OAuth
+authorization-code grant for user-delegated access, client-credentials
+grant for service-to-service calls, and on-behalf-of token exchange
+(RFC 8693), which trades the caller's own inbound JWT for a downstream
+token scoped to that specific user, so the agent can act for someone
+without re-prompting them for consent.
+
+Identity doesn't replace Cognito, Okta, or Auth0 either — end users still
+authenticate through whichever of those already runs. What it adds is the
+missing link between "a user logged in somewhere else" and "the agent can
+now call a downstream API as that user," a link IAM was never built to
+hold because the far end of that call was never an AWS resource. Most
+clouds already have some version of a workload-identity concept for
+service-to-service calls — Kubernetes and GCP both ship one — so
+AgentCore's version is that pattern extended to a caller that happens to
+be a model, not a wholly new idea; the RFC 8693 exchange piece is the
+part that's genuinely specific to bridging an inbound agent call to an
+outbound per-user one.
 
 ### Memory
 
