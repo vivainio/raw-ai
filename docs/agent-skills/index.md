@@ -19,7 +19,7 @@ my-skill/
 
 `SKILL.md` starts with frontmatter, then plain instructions:
 
-```markdown
+````markdown
 ---
 name: my-skill
 description: One line describing what this does and when to use it.
@@ -27,12 +27,18 @@ description: One line describing what this does and when to use it.
 
 # My Skill
 
-Instructions for the agent go here.
+Run the bundled script instead of reimplementing this logic inline:
+
+```sh
+bash scripts/helper.sh <arg>
 ```
+````
 
 The `description` is the only part the agent sees before deciding to load the
 skill, so make it specific: what the skill does *and* the triggers that should
-cause it to fire.
+cause it to fire. Everything else in `SKILL.md` — including the path to
+`scripts/helper.sh` — is instructions the agent follows once it's decided to
+use the skill, the same way it'd follow any other command you gave it.
 
 ## One folder, not one per project
 
