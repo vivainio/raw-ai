@@ -89,3 +89,23 @@ every tool sees the change immediately.
     project's internal tooling, say — keep it in a real (non-symlinked)
     `.claude/skills/` inside the repo instead. Reserve the home-directory
     store for skills you'd want anywhere.
+
+## Be wary of third-party skills
+
+A skill isn't sandboxed — its instructions and any scripts it bundles run with
+the same access to your machine the agent already has: your files, your
+shell, your credentials. Installing a random skill from GitHub is closer to
+running a random shell script than installing a linted editor plugin. Read
+`SKILL.md` and everything under `scripts/` before adding one, the same way
+you'd review a PR before merging it.
+
+## Prefer task-focused skills over workflow overhauls
+
+Skills that teach the agent a specific tool — a CLI, an internal API, a niche
+file format — stay useful indefinitely. Skills that try to overhaul how the
+agent works in general — its coding style, its planning process, generic
+"how to write good code" advice — have a shrinking shelf life: the
+underlying models keep getting better at exactly that kind of generic
+judgment on their own, without being told. Write skills for the specific
+things a model can't already infer, not for behavior you could get by asking
+a better model.
