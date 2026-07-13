@@ -188,19 +188,25 @@ bash/Python execution, except the sandbox is a rented AWS resource behind
 an API call rather than a subprocess on the same machine.
 
 That last comparison is worth taking seriously, because it's the actual
-reason this tool exists rather than being a footnote. Models are bad at
-exact computation — arithmetic, counting, sorting, aggregating a column
-of numbers — because producing a token is a probabilistic guess at what
-comes next, not a calculation. The reliable fix is always the same one:
-have the model write a short, deterministic script and run it, then read
-back the exact answer instead of asking the model to hold and manipulate
-the data itself. This is exactly what's happening on your own machine
-constantly when Claude Code reaches for a shell command or a quick Python
-script to count matches or average a column, rather than doing that
-arithmetic in its response — same move, just a local subprocess instead
-of a rented AWS sandbox. Code Interpreter just gives a cloud-hosted agent
-the same "delegate the math to real code" escape hatch a local coding
-agent already has for free — the technique predates the product.
+reason this tool exists rather than being a footnote. The scope is bigger
+than arithmetic — any data analysis where the data is too big or too
+regular to push through the model's own reasoning reliably: filtering
+ten thousand rows down to the ones that match, aggregating a column,
+diffing two large blobs, reshaping a file from one format to another.
+Doing that by having the model read the whole thing and reason it out
+token by token is slow, expensive in context, and error-prone in a way
+running actual code isn't — code either produces the right filtered rows
+or it doesn't, there's no probabilistic guessing in between. The reliable
+move is always the same: have the model write a short, deterministic
+script, run it, and read back the (usually much smaller) result instead
+of asking the model to hold and manipulate the raw data itself. This is
+exactly what's happening on your own machine constantly when Claude Code
+reaches for a shell command or a quick Python script to grep a log,
+reshape a CSV, or count matches, rather than eyeballing all of it
+directly — same move, just a local subprocess instead of a rented AWS
+sandbox. Code Interpreter just gives a cloud-hosted agent the same
+"delegate the data work to real code" escape hatch a local coding agent
+already has for free — the technique predates the product.
 
 It's also a separate disk, not a shared mount with the Runtime container
 that invoked it. A file your agent process can see isn't automatically
