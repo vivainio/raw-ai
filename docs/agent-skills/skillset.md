@@ -29,7 +29,22 @@ skillset search jenkins
 skillset search doc-%     # glob
 ```
 
-Searches everything cached locally, offline.
+Searches everything cached locally, offline — which means you can stock up on
+repos before you know which skill you want:
+
+```sh
+skillset add vivainio/agent-skills --fetch   # clone/cache only, link nothing
+skillset add some-org/other-skills --fetch
+```
+
+Then later, once you remember you need something:
+
+```sh
+skillset search invoice
+```
+
+turns up matches across every repo you've fetched, without you having to
+recall which one it was in.
 
 ## Removing
 
