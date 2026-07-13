@@ -181,6 +181,34 @@ go — it has to know how to sign the request first. From Playwright's
 side this is a drop-in remote browser; from a generic CDP client's side,
 it's gated behind AWS auth rather than an open localhost port.
 
+Worth spelling out what "the model drives the browser" actually means
+mechanically, since it's easy to picture the model writing Playwright
+code directly. Normally it doesn't. It's the same `tool_use`/`tool_result`
+loop from the [Agent Dialogue](../agent-dialogue/index.md) chapter,
+applied to a page instead of a shell, with the harness doing the actual
+Playwright calls:
+
+1. The harness takes a **snapshot** of the current page — a compact text
+   tree of interactive elements, each with a short reference like
+   `ref=e3` — not a screenshot. That snapshot comes back as the
+   `tool_result`.
+2. The model reads that text, decides "click the login button," and
+   emits a `tool_use` block: `{"name": "click", "input": {"ref": "e3"}}`.
+3. The harness, not the model, turns `ref=e3` into an actual Playwright
+   call against the CDP connection above, and runs it.
+4. The harness takes a **new** snapshot of whatever the page looks like
+   now and returns that as the next `tool_result`.
+5. Repeat — one tool call, one action, one updated snapshot, every turn.
+
+Playwright is running the whole time, but the model only ever sees the
+snapshot/ref layer, never raw HTML or the Playwright API itself. A
+different pattern is possible on the same CDP connection: hand the model
+Code Interpreter instead, and it can write a whole multi-step Playwright
+script and run it in one shot, trading the ability to react after each
+click for fewer round-trips. AgentCore doesn't pick between these —
+Browser is just the raw CDP endpoint; which loop you get depends on
+whatever harness is wrapping it, not on AWS.
+
 ### Code Interpreter
 
 Code Interpreter is the same story again: another container image on the
