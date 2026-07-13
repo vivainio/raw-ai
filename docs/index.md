@@ -10,8 +10,7 @@ material, technical analysis, and opinions — no press-release language, no
 because everyone else repeats them. If something works, that's said once,
 with the reason. If it doesn't, that's said too.
 
-It grows one topic at a time, as things get tried and reasoned through, not
-from a fixed curriculum.
+It grows one topic at a time, not from a fixed curriculum.
 
 ## Chapters
 
