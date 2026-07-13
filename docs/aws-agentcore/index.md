@@ -756,6 +756,22 @@ the result in hand, same as any other tool call; the difference from a
 Gateway or Browser tool is entirely about who ran the code, not how the
 message gets back into the loop.
 
+That "just send the new message" claim only holds because persistence is
+automatic, not something wired up per call. Every invocation writes to a
+Memory instance the harness provisions for you by default — no setup
+required — and the next call on that same session ID loads prior turns
+back out of Memory before the model reasons, rather than the client
+resending the whole conversation to keep it going. It's the same
+short-term/long-term split Memory already documented above, minus the
+manual `create_event`/`retrieve_memories` calls that section walked
+through — the harness makes those calls for you, at both ends of every
+turn, using whichever strategies (semantic, summarization, user
+preference, episodic) the harness config specifies. History that grows
+past the model's context window is bounded by a configurable truncation
+strategy — a sliding window over the most recent messages by default, or
+a summarization pass that compresses older turns instead of dropping
+them — rather than left to grow until a call fails.
+
 Which makes pydantic.ai the wrong comparison. Pydantic.ai, like Strands
 itself, LangGraph, or CrewAI, is a library you import and write Python
 against — a real reduction in boilerplate, but you still own the loop and
