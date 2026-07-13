@@ -48,9 +48,25 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [Hosting: AWS Bedrock](aws-bedrock/index.md) — the model-hosting layer
+  underneath AgentCore, Strands, and Pydantic AI: one API across
+  providers, plus Guardrails, Knowledge Bases, and the classic Agents
+  product AgentCore didn't replace.
 - [Hosting: AWS AgentCore](aws-agentcore/index.md) — pulling apart AWS's
   bundle of a dozen billed services to see which parts are genuinely new
   and which are existing AWS primitives with an agent-shaped label.
+- [Frameworks: Pydantic AI](pydantic-ai/index.md) — a Python-native agent
+  library: typed dependencies and structured output, deferred tools for
+  pausing on approval, and how much of AgentCore's surface stays manual
+  no matter which framework calls it.
+- [Frameworks: Strands Agents](strands-agents/index.md) — AWS's own
+  open-source framework, the one running headless inside AgentCore's
+  Harness, compared against Pydantic AI on session state, multi-agent
+  orchestration, and pausing for human approval.
+- [Frameworks: Microsoft Agent Framework](microsoft-agent-framework/index.md) —
+  Semantic Kernel and AutoGen merged into one project, compared against
+  Pydantic AI and Strands on swappable model clients, workflows, and
+  hosting on Microsoft's own Foundry runtime.
 - [The OpenAI API](openai-api/index.md) — how the Chat Completions shape
   became the thing every inference server clones, where that cloning stops
   at the Responses API's statefulness and hosted tools, and what OpenAI's
