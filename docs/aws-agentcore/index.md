@@ -194,6 +194,27 @@ hooks so this read-then-write pair can live at the edges of the loop
 instead of threaded through every call site — but the hook is just a
 place to put the same manual glue, not automation that replaces it.
 
+Which raises the obvious question: how is any of this different from
+just writing events to a DynamoDB table yourself? For short-term memory,
+it mostly isn't — that's a raw log keyed by actor and session, a shape
+you could stand up yourself in an afternoon, probably for less money.
+Long-term memory is where the real gap sits, and it's two things, not
+one. First, `retrieve_memories` isn't a key lookup — the `query` argument
+gets embedded and matched by similarity against the stored records, which
+means there's a managed vector index behind it. Plain DynamoDB has no
+such thing; getting this yourself means standing up OpenSearch, pgvector,
+or a dedicated vector store and keeping its embeddings in sync with every
+write. Second, the raw event log isn't what gets searched at all — a
+background job reads it and produces the distilled records retrieval
+actually queries, which means an LLM call, a decision about what's worth
+keeping, and presumably some de-duplication over time, all running on
+AWS's schedule instead of yours. Storing events yourself gets you the
+easy half of this — the write path. The half you'd actually have to build
+is the embedding pipeline and the summarization job sitting between the
+raw log and the thing you query — and that gap isn't specific to AWS;
+it's the same gap any RAG-over-conversation-history setup has to close,
+however it's built.
+
 ### Observability
 
 Observability is OpenTelemetry traces landing in CloudWatch, with a
