@@ -52,6 +52,17 @@ directory names and file formats, not the shape of the thing.
   decode loop, why the prompt is fast and the reply is slow, and why the
   KV cache is the same mechanism behind context limits, prompt caching,
   and streaming.
+- [Theory: Tokenization](tokenization/index.md) — the byte-pair-encoding
+  algorithm that builds a token vocabulary, why Claude's own tokenizer
+  changed between model generations, and why code and non-English text
+  cost more tokens per character than English prose does.
+- [RAG](rag/index.md) — retrieval-augmented generation stripped down to
+  what it actually is: chunk, embed, search — and why an agent should call
+  that search as a tool instead of running it once before its first turn.
+- [Prompt Caching](llm-caching/index.md) — why a cache is a prefix match,
+  not a lookup table: breakpoint placement, the write/read cost tradeoff,
+  and the silent invalidators that quietly turn a cached agent back into
+  an uncached one.
 - [Hosting: AWS Bedrock](aws-bedrock/index.md) — the model-hosting layer
   underneath AgentCore, Strands, and Pydantic AI: one API across
   providers, plus Guardrails, Knowledge Bases, and the classic Agents
