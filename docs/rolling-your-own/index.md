@@ -69,8 +69,8 @@ def run_agent(prompt: str, system: str = "") -> str:
         messages.append({"role": "user", "content": results})
 ```
 
-`run_agent("What's the weather in Turku?")` makes one call, sees
-`stop_reason == "tool_use"`, runs `get_weather(city="Turku")` locally,
+`run_agent("What's the weather in Pori?")` makes one call, sees
+`stop_reason == "tool_use"`, runs `get_weather(city="Pori")` locally,
 feeds the string back as a `tool_result`, and loops — the second call
 gets a plain text reply and the function returns. Nothing here is
 Anthropic-specific in shape; OpenAI's `tool_calls` and Gemini's
