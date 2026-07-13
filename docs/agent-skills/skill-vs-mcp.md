@@ -45,6 +45,11 @@ interface" alongside the human one. `zaira get FOO-123` is the whole
 integration — the agent runs it, you can run the identical command yourself
 in your own terminal to see exactly what it saw.
 
+None of this trades away capability. zaira talks to the same Jira REST API a
+Jira MCP server would talk to — there's no official, more-privileged channel
+that only MCP gets to use. Whichever wraps the API, CLI or MCP server, has
+exactly the same access to the product.
+
 ## A vendor doing the same thing: Playwright
 
 This isn't just a third-party pattern. Microsoft shipped `@playwright/mcp`
