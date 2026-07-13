@@ -164,6 +164,36 @@ read them back later when relevant — except AWS's version runs the
 "decide what's worth remembering" step as a paid, asynchronous call
 instead of the agent just writing a file.
 
+None of that is wired to the model call, though. Memory is a
+store-and-retrieve API — writing an event and reading memories back are
+two explicit calls your code makes, at opposite ends of the loop:
+
+```python
+# after a turn: append to the raw event log
+client.create_event(
+    memory_id=memory_id,
+    actor_id=actor_id,
+    session_id=session_id,
+    messages=[(user_text, "USER"), (reply_text, "ASSISTANT")],
+)
+
+# before the next turn: pull back whatever got extracted
+memories = client.retrieve_memories(
+    memory_id=memory_id,
+    namespace=f"/summaries/{actor_id}/{session_id}/",
+    query=next_user_text,
+)
+```
+
+`retrieve_memories` returns text — nothing splices it into the prompt for
+you. That's still your code, same as it would be with any vector store:
+concatenate it onto the next message or the system prompt yourself before
+the model call, e.g. `messages[-1]["content"] = f"Context:\n{memories}\n\n{original_text}"`.
+Some agent frameworks expose "before model call" / "after model call"
+hooks so this read-then-write pair can live at the edges of the loop
+instead of threaded through every call site — but the hook is just a
+place to put the same manual glue, not automation that replaces it.
+
 ### Observability
 
 Observability is OpenTelemetry traces landing in CloudWatch, with a
