@@ -21,6 +21,10 @@ repo_name = "vivainio/raw-ai"
 # Explicit navigation. Add sections here as the site grows.
 nav = [
   { "Home" = "index.md" },
+  { "Agent Skills" = [
+    { "Overview" = "agent-skills/index.md" },
+    { "Managing skills with skillset" = "agent-skills/skillset.md" },
+  ] },
 ]
 
 extra_css = ["stylesheets/extra.css"]
