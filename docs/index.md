@@ -63,3 +63,11 @@ directory names and file formats, not the shape of the thing.
   open-source framework, the one running headless inside AgentCore's
   Harness, compared against Pydantic AI on session state, multi-agent
   orchestration, and pausing for human approval.
+- [Frameworks: Microsoft Agent Framework](microsoft-agent-framework/index.md) —
+  Semantic Kernel and AutoGen merged into one project, compared against
+  Pydantic AI and Strands on swappable model clients, workflows, and
+  hosting on Microsoft's own Foundry runtime.
+- [The OpenAI API](openai-api/index.md) — how the Chat Completions shape
+  became the thing every inference server clones, where that cloning stops
+  at the Responses API's statefulness and hosted tools, and what OpenAI's
+  own churn from Assistants to Responses says about the rest.
