@@ -17,6 +17,12 @@ here is closer to curator or producer than author — deciding what's worth
 covering, what's accurate, and what gets cut — not typing every sentence by
 hand.
 
+Most examples are drawn from Claude Code, since that's the tool this book
+is written with and the one most readers will have actually touched. Where
+it matters, the underlying mechanism — system prompts, tool calls, memory
+files — is common across coding agents; the vendor-specific parts are the
+directory names and file formats, not the shape of the thing.
+
 ## Chapters
 
 - [Agent Skills](agent-skills/index.md) — what a skill actually is, keeping
