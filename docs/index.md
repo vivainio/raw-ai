@@ -51,3 +51,7 @@ directory names and file formats, not the shape of the thing.
 - [Hosting: AWS AgentCore](aws-agentcore/index.md) — pulling apart AWS's
   bundle of a dozen billed services to see which parts are genuinely new
   and which are existing AWS primitives with an agent-shaped label.
+- [The OpenAI API](openai-api/index.md) — how the Chat Completions shape
+  became the thing every inference server clones, where that cloning stops
+  at the Responses API's statefulness and hosted tools, and what OpenAI's
+  own churn from Assistants to Responses says about the rest.
