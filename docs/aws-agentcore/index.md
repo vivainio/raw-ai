@@ -309,13 +309,54 @@ separate stores, and you're the one wiring the pipe between them.
 ### Gateway
 
 Gateway is the one piece here that saves real work. Point it at an
-OpenAPI spec or a Lambda function and it generates an MCP-compatible tool
-endpoint — with inbound and outbound auth wired in — without you writing a
-tool wrapper by hand. It also does semantic and keyword search over the
-tools it exposes, so an agent with access to hundreds of tools doesn't
-need all of their descriptions stuffed into context just to pick the
-right one. If you were going to hand-roll "expose fifteen internal APIs
-to an agent as tools," Gateway saves that work for real.
+OpenAPI spec, a Lambda function, or a Smithy model and it stands up an
+MCP server for you — one tool per API operation, with the tool's name and
+input schema generated straight from the spec — without you writing an
+MCP server or a tool wrapper by hand. An agent talks to the result the
+same way it talks to any MCP server: connect, `list_tools()`,
+`call_tool()`.
+
+```python
+target_config = {"mcp": {"openApiSchema": {"s3": {"uri": openapi_s3_uri}}}}
+credential_config = [{
+    "credentialProviderType": "API_KEY",
+    "credentialProvider": {"apiKeyCredentialProvider": {
+        "credentialParameterName": "api_key",
+        "providerArn": credential_provider_arn,
+        "credentialLocation": "QUERY_PARAMETER",
+    }},
+}]
+gateway_client.create_gateway_target(
+    gatewayIdentifier=gateway_id,
+    targetConfiguration=target_config,
+    credentialProviderConfigurations=credential_config,
+)
+```
+
+That call is doing two separate things, and "inbound and outbound auth
+wired in" glosses over which is which. Inbound auth is set once, on the
+gateway itself, not per target — a JWT authorizer pointing at whatever
+OIDC provider issues the agent's token, gating who's allowed to call the
+gateway's MCP endpoint at all. Outbound auth is set per target, in the
+`credentialProviderConfigurations` block above — the API key, OAuth
+token, or IAM role the gateway attaches when it forwards a call through
+to the actual backend API. The agent authenticates once, to the gateway;
+it never sees the downstream credential. That's the same inbound/outbound
+split Identity uses further down, just applied to the gateway's own
+outbound calls instead of the agent's.
+
+The search half works the same way as any other tool: a gateway created
+with search enabled stands up a vector store
+behind the scenes, embeds every attached tool's name and description into
+it, and exposes one more MCP tool, `x_amz_bedrock_agentcore_search`, that
+takes a `query` string and returns whichever tools match. An agent
+sitting in front of hundreds of tools calls that search tool first, gets
+back the handful that are relevant, and only those descriptions ever land
+in context — instead of every tool description being loaded up front
+regardless of whether that turn needs it. Both halves — spec-to-tool
+generation and searchable tool discovery — are things you'd otherwise
+build by hand, which is why Gateway is a real time save rather than a
+managed wrapper around something trivial.
 
 ### Identity
 
