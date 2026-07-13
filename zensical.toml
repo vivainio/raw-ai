@@ -30,6 +30,7 @@ nav = [
   { "Agent Memory" = "agent-memory/index.md" },
   { "Hosting: AWS AgentCore" = "aws-agentcore/index.md" },
   { "Frameworks: Pydantic AI" = "pydantic-ai/index.md" },
+  { "Frameworks: Strands Agents" = "strands-agents/index.md" },
 ]
 
 extra_css = ["stylesheets/extra.css"]
