@@ -48,6 +48,10 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [Prompt Caching](llm-caching/index.md) — why a cache is a prefix match,
+  not a lookup table: breakpoint placement, the write/read cost tradeoff,
+  and the silent invalidators that quietly turn a cached agent back into
+  an uncached one.
 - [Hosting: AWS Bedrock](aws-bedrock/index.md) — the model-hosting layer
   underneath AgentCore, Strands, and Pydantic AI: one API across
   providers, plus Guardrails, Knowledge Bases, and the classic Agents
