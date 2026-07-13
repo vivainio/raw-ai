@@ -55,6 +55,44 @@ container; it's what happens to that container once it's running:
 per-session isolation, fast cold starts, and a bill measured in vCPU- and
 GB-seconds instead of a fixed instance.
 
+The base image itself is nothing special either — `python:3.13-slim` or
+equivalent, no AgentCore-branded layer to pull. The only thing that ties
+the container to AgentCore at all is one Python package, `bedrock-agentcore`,
+and inside it a single decorator: `BedrockAgentCoreApp`. It wraps whatever
+function you point it at so that a plain Python call turns into the
+`/invocations`/`/ping` contract Runtime expects — request parsing,
+streaming, session headers, all handled by that one wrapper.
+
+Because the wrapper only cares about "function in, response out," it
+doesn't know or care what's inside the function. Any agent framework
+plugs in the same way — here it's wrapping an agent built with a
+structured-output framework:
+
+```python
+from bedrock_agentcore import BedrockAgentCoreApp
+from some_agent_framework import Agent
+
+app = BedrockAgentCoreApp()
+agent = Agent(model, instructions="Be concise.")
+
+@app.entrypoint
+def invoke(payload: dict, context=None) -> str:
+    result = agent.run_sync(payload["prompt"])
+    return result.output
+
+if __name__ == "__main__":
+    app.run()
+```
+
+Swap `some_agent_framework` for LangGraph, CrewAI, Strands, or nothing at
+all — a bare function calling the model directly works too. AWS didn't
+build a connector for any specific agent framework, and none of them
+built one for AWS; both sides just happen to agree on "a Python function
+that returns a string or a stream." That's the entire integration
+surface. Everything framework-specific — tool definitions, retries,
+structured output validation — stays exactly as it was outside AgentCore;
+Runtime never sees it.
+
 **Browser** and **Code Interpreter** bill at the *exact same* vCPU-hour
 and GB-hour rates as Runtime. That's the tell — they're not bespoke
 products, they're Runtime with a different container image and a product
