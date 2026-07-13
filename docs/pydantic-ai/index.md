@@ -61,6 +61,32 @@ you maintain by hand. A wrong `deps_type` or a tool that returns the wrong
 shape is a type-checker error at write time, not something that only
 surfaces when a particular code path runs in production.
 
+## There's no session object
+
+`agent.run()` doesn't remember the previous call. There's no thread ID,
+no server-side conversation object, nothing to look up — every run starts
+from whatever `message_history` you hand it, full stop, and the *caller*
+is what's expected to hold that history between turns:
+
+```python
+result1 = agent.run_sync("Tell me a joke.")
+result2 = agent.run_sync("Explain?", message_history=result1.new_messages())
+```
+
+Skip that second argument and `result2` has no idea a first message ever
+happened — it's a fresh run, not a continuation. This is the baseline for
+every multi-turn conversation in Pydantic AI, not a special case for any
+one feature: the caller — your API layer, your CLI, whatever's on the
+other end of a websocket — is the thing carrying state turn to turn, the
+same way a plain stateless HTTP API needs a client to keep resending a
+session token. Compare that to [AgentCore's
+Harness](../aws-agentcore/index.md), which auto-persists every turn to a
+Memory instance keyed by session ID specifically so the client only ever
+sends the new message. Pydantic AI doesn't do that for you — if you want
+it, you build it, typically by storing `result.new_messages()` somewhere
+keyed by your own session ID and loading it back before the next
+`agent.run()` call.
+
 ## Structured output is enforced, not requested
 
 Passing a Pydantic model as `output_type` doesn't just ask the model
@@ -151,9 +177,11 @@ a service AWS bills you for by the second.
 
 ## Pausing without a workflow engine: deferred tools
 
-There's a third option between "no persistence" and "wrap it in
-Temporal/DBOS": pause the run itself and hand the unfinished state to
-whoever's easiest to trust with it, no workflow engine involved. Two
+Carrying `message_history` between calls, as above, is true of every run
+regardless of what happens inside it. Deferred tools don't add that
+requirement — it was already there. What they add is a second reason a
+run can end early besides "here's the answer": a tool needs a human to
+sign off, or its work has to happen somewhere else entirely. Two
 mechanisms share this shape. A tool that needs a human to sign off raises
 `ApprovalRequired` (or is declared with
 `@agent.tool_plain(requires_approval=True)`); a tool whose work has to
@@ -194,22 +222,27 @@ results.approvals[pending.approvals[0].tool_call_id] = True  # or ToolDenied("re
 result = agent.run_sync(message_history=messages, deferred_tool_results=results)
 ```
 
-The framework has no opinion on who holds `messages` and `results`
-between those two calls, or for how long. If both calls happen seconds
-apart in the same process, nothing ever leaves memory. If a human needs
-minutes to approve a deletion, the natural place to put that state is
-wherever the human is already looking — a frontend that's already
-rendering the conversation serializes `messages`
-(`ModelMessagesTypeAdapter.dump_python`) into whatever payload it sends
-on the next request, and the server goes back to holding nothing between
-calls.
+`messages` is the same thing every multi-turn call already threads
+through `message_history` — nothing new there. `results` is the one
+genuinely new piece: the pending tool calls need an answer from somewhere
+before the model can move past them, the same way any tool call does,
+just supplied out-of-band instead of by a function executing inline. The
+framework has no opinion on who holds either between the two calls, or
+for how long. If both calls happen seconds apart in the same process,
+nothing leaves memory. If a human needs minutes to approve a deletion,
+the natural place to put that state is wherever the human is already
+looking — a frontend that's already rendering the conversation serializes
+`messages` (`ModelMessagesTypeAdapter.dump_python`) into whatever payload
+it sends on the next request, same as it would for a plain turn, plus the
+approval decision alongside it.
 
 That's a genuinely different answer to "how do you not lose an in-flight
 run" than `TemporalAgent`/`DBOSAgent` above. Those checkpoint every step
 server-side, so a crash resumes on its own without the caller doing
-anything. Deferred tools checkpoint nothing — they hand the entire
-unfinished run to whichever caller is on the other end and trust that
-caller to bring it back intact. That's cheaper (no workflow engine, no
+anything. Deferred tools checkpoint nothing beyond the ordinary
+message-history state a caller was already responsible for — they just
+add one more piece to it and give the run a way to say "not done, waiting
+on you" instead of erroring. That's cheaper (no workflow engine, no
 Postgres, no cluster to operate) and it fits naturally behind a stateless
 server that treats every request as independent, but the state only
 survives as long as whatever's holding `messages` does — lose that copy
