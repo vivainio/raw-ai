@@ -153,6 +153,34 @@ It competes directly with Browserbase, E2B, or Cloudflare's Sandbox SDK,
 and the pitch is the managed sandbox plus the AWS IAM boundary around it,
 not novel execution technology.
 
+Concretely, it's a CDP WebSocket endpoint, and vanilla Playwright
+connects to it the normal way:
+
+```python
+from bedrock_agentcore.tools.browser_client import browser_session
+from playwright.sync_api import sync_playwright
+
+with browser_session(region) as client:
+    ws_url, headers = client.generate_ws_headers()
+    with sync_playwright() as pw:
+        browser = pw.chromium.connect_over_cdp(ws_url, headers=headers)
+        page = browser.contexts[0].pages[0]
+        page.goto("https://example.com")
+```
+
+`connect_over_cdp` is the same call any browser-automation tool uses to
+attach to an existing Chrome instance. The model's driving loop — read
+the page, decide an action, click or fill or navigate, look again —
+doesn't change at all; only the target does, a remote AWS-managed
+Chromium instead of a local subprocess. The one real wrinkle is that
+`headers` argument: it carries SigV4-signed AWS auth from
+`generate_ws_headers()`, not just a WebSocket URL you can open from
+anywhere. A tool that only knows plain CDP, with no way to attach a
+signed header to the handshake, can't just point at this endpoint and
+go — it has to know how to sign the request first. From Playwright's
+side this is a drop-in remote browser; from a generic CDP client's side,
+it's gated behind AWS auth rather than an open localhost port.
+
 ### Code Interpreter
 
 Code Interpreter is the same story again: another container image on the
