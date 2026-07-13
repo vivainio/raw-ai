@@ -45,6 +45,18 @@ interface" alongside the human one. `zaira get FOO-123` is the whole
 integration — the agent runs it, you can run the identical command yourself
 in your own terminal to see exactly what it saw.
 
+## A vendor doing the same thing: Playwright
+
+This isn't just a third-party pattern. Microsoft shipped `@playwright/mcp`
+first, then followed it with `@playwright/cli` — a plain CLI plus a skill,
+now the recommended way to drive Playwright from a coding agent. Same
+browser, same actions (`click`, `type`, `goto`, `screenshot`), invoked through
+Bash instead of an MCP tool call. Reported numbers for equivalent tasks: about
+115,000 tokens through the MCP server versus about 25,000 through the CLI —
+MCP streams full accessibility trees and screenshot bytes into context on
+every call, where the CLI writes to disk and lets the agent read only what it
+needs.
+
 ## Why this wins for CLI-shaped tools
 
 - **Cost.** Until the skill's description matches what you're doing, all that
