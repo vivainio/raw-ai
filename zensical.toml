@@ -28,6 +28,7 @@ nav = [
   ] },
   { "Agent Dialogue" = "agent-dialogue/index.md" },
   { "Agent Memory" = "agent-memory/index.md" },
+  { "Theory: Inference" = "inference/index.md" },
   { "Theory: Tokenization" = "tokenization/index.md" },
   { "RAG" = "rag/index.md" },
   { "Prompt Caching" = "llm-caching/index.md" },
