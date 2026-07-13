@@ -124,6 +124,20 @@ don't want leaking across users — executed code, browser cookies and
 local storage, accumulated conversation state — where a shared warm
 container would be a real security bug, not just a caching quirk.
 
+That isolation applies to the filesystem specifically, and by default it
+cuts both ways: a file a session writes exists only on that session's
+microVM, invisible to every other session, *and* it doesn't outlive the
+VM either — when the session ends, the filesystem goes with it. Invoke
+the same session ID again later and you get a clean disk in a new VM, not
+your file back. There are two named, opt-in exceptions, both things you'd
+have to deliberately configure rather than stumble into: managed session
+storage (preview) lets one specific session's files survive a stop/resume
+cycle, still scoped to that one session; and a shared filesystem mount
+(S3 Files or EFS) breaks isolation on purpose, so multiple sessions,
+agents, or outside applications can read and write the same files. Left
+at the defaults, there's no accidental way for one session to see another
+session's disk.
+
 ### Browser
 
 Browser is metered exactly the same way as Runtime — same unit, same
