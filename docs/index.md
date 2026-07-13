@@ -48,6 +48,10 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [RAG](rag/index.md) — retrieval-augmented generation stripped down to
+  what it actually is: chunk, embed, search, paste into the prompt — and
+  why turning that search into a tool call is the whole difference between
+  naive and agentic RAG.
 - [Hosting: AWS Bedrock](aws-bedrock/index.md) — the model-hosting layer
   underneath AgentCore, Strands, and Pydantic AI: one API across
   providers, plus Guardrails, Knowledge Bases, and the classic Agents
