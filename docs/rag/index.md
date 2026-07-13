@@ -109,6 +109,11 @@ well-worded query, and it falls apart the moment either isn't true:
   gets the same chunk-stuffing treatment as a question that genuinely
   depends on the corpus.
 
+The fix for all three is the same: stop running retrieval once, before
+generation starts, with no way back. Make it a tool call the model can
+invoke, inspect the result of, and invoke again — inside the loop, not in
+front of it.
+
 ## Integrating with an agent: retrieval as a tool call
 
 The [Agent Dialogue](../agent-dialogue/index.md) chapter covers the actual
