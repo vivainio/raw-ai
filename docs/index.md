@@ -48,3 +48,6 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [Hosting: AWS AgentCore](aws-agentcore/index.md) — pulling apart AWS's
+  bundle of a dozen billed services to see which parts are genuinely new
+  and which are existing AWS primitives with an agent-shaped label.
