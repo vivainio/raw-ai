@@ -6,14 +6,14 @@ icon: lucide/cloud
 
 Amazon Bedrock AgentCore is marketed as "an agentic platform for building,
 deploying, and operating highly effective agents securely at scale." That
-sentence is true and says almost nothing. The useful question isn't what
-AWS calls it — it's what you actually get for the bill, and how much of it
-is new versus an existing AWS primitive wearing an agent-shaped label.
+sentence is true and says almost nothing. What matters more than AWS's
+label for it is what you actually get for the bill, and how much of it is
+new versus an existing AWS primitive wearing an agent-shaped label.
 
 ## What ships under the name
 
-AgentCore isn't one service. It's a bundle of a dozen separately billed
-pieces, and the list has grown since launch:
+AgentCore is a bundle of a dozen separately billed pieces, and the list
+has grown since launch:
 
 | Piece | What AWS says it does |
 |---|---|
@@ -34,7 +34,7 @@ Each of these is its own line item, its own pricing unit, its own docs
 page. "Platform" is the right word in the sense that it's a lot of
 surface area — not in the sense that it's one coherent thing.
 
-## The load-bearing pieces, taken apart
+## Taking each piece apart
 
 ### Runtime
 
@@ -50,12 +50,12 @@ that specific problem, not a new idea.
 You still bring your own container. Build a Docker image (ARM64 only —
 build it on x86 and dependencies fail silently at runtime), expose
 `POST /invocations` and `GET /ping` on port 8080, push it to ECR. Runtime
-pulls that image into the microVM per session. This isn't an escape hatch
-for "custom environments" — it's the default shape of every agent you
-deploy to it. What AWS is selling isn't a way to avoid packaging your own
-container; it's what happens to that container once it's running:
-per-session isolation, fast cold starts, and a bill measured in vCPU- and
-GB-seconds instead of a fixed instance.
+pulls that image into the microVM per session, and that's true of every
+agent deployed here, not just an escape hatch for "custom environments."
+Packaging your own container is simply required. What you're paying AWS
+for is what happens to that container once it's running: per-session
+isolation, fast cold starts, and a bill measured in vCPU- and GB-seconds
+instead of a fixed instance.
 
 The base image itself is nothing special either — `python:3.13-slim` or
 equivalent, no AgentCore-branded layer to pull. The only thing that ties
@@ -115,7 +115,7 @@ The point of contrast is Lambda's warm-start model, which also reuses
 execution environments but opaquely, as an efficiency detail you're not
 meant to depend on — a warm container can quietly serve unrelated
 invocations, and there's no caller-facing guarantee about which one lands
-where. AgentCore makes that boundary explicit and load-bearing instead of
+where. AgentCore makes that boundary explicit and guaranteed instead of
 incidental: this session ID always maps to its own VM, no other session
 ever shares it, and teardown is deliberate rather than left to whatever
 the scheduler feels like reusing. That matters more here than it does for
@@ -141,8 +141,8 @@ session's disk.
 ### Browser
 
 Browser is metered exactly the same way as Runtime — same unit, same
-rate. That's the tell — it isn't a bespoke product, it's Runtime with a
-different container image and a product name: a managed headless browser
+rate, which gives away what it actually is: Runtime wearing a different
+container image and a product name, wrapping a managed headless browser
 (Playwright- and BrowserUse-compatible) with a live view for watching a
 session and a recording for replaying one later. One genuinely specific
 feature sits on top: it can cryptographically sign outbound HTTP requests
@@ -171,7 +171,7 @@ tool wrapper by hand. It also does semantic and keyword search over the
 tools it exposes, so an agent with access to hundreds of tools doesn't
 need all of their descriptions stuffed into context just to pick the
 right one. If you were going to hand-roll "expose fifteen internal APIs
-to an agent as tools," Gateway is a genuine shortcut, not a rebrand.
+to an agent as tools," Gateway saves that work for real.
 
 ### Identity
 
@@ -300,8 +300,8 @@ per-second meter on each one and shipping them as one console tab.
 
 ## What you're actually paying for
 
-Given that, the honest pitch for AgentCore isn't "smarter agents" — none
-of these pieces make a model reason better. It's operational: one bill,
+Given that, the honest pitch for AgentCore is operational, not "smarter
+agents" — none of these pieces make a model reason better. One bill,
 one IAM boundary, one observability pipeline, instead of assembling the
 same shape yourself from Lambda, Cognito, an OTel collector, and a
 third-party browser sandbox. That's a legitimate reason to buy it if
