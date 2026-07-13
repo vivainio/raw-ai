@@ -48,6 +48,10 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [Theory: Tokenization](tokenization/index.md) — the byte-pair-encoding
+  algorithm that builds a token vocabulary, why Claude's own tokenizer
+  changed between model generations, and why code and non-English text
+  cost more tokens per character than English prose does.
 - [RAG](rag/index.md) — retrieval-augmented generation stripped down to
   what it actually is: chunk, embed, search — and why an agent should call
   that search as a tool instead of running it once before its first turn.
