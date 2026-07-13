@@ -24,6 +24,7 @@ nav = [
   { "Agent Skills" = [
     { "Overview" = "agent-skills/index.md" },
     { "Managing skills with skillset" = "agent-skills/skillset.md" },
+    { "Skill + CLI instead of MCP" = "agent-skills/skill-vs-mcp.md" },
   ] },
 ]
 
