@@ -33,6 +33,7 @@ nav = [
   { "Frameworks: Pydantic AI" = "pydantic-ai/index.md" },
   { "Frameworks: Strands Agents" = "strands-agents/index.md" },
   { "Frameworks: Microsoft Agent Framework" = "microsoft-agent-framework/index.md" },
+  { "Frameworks: Rolling Your Own" = "rolling-your-own/index.md" },
   { "The OpenAI API" = "openai-api/index.md" },
 ]
 
