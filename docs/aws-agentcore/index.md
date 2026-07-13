@@ -345,6 +345,66 @@ it never sees the downstream credential. That's the same inbound/outbound
 split Identity uses further down, just applied to the gateway's own
 outbound calls instead of the agent's.
 
+Worth unpacking what "attaches" means, since it's easy to read that as
+just plugging a stored string into a template. The `providerArn` in the
+target config above doesn't point at the secret directly — it points at a
+**credential provider**, a named object in AgentCore Identity (the same
+piece described below), created once, upfront:
+
+```python
+response = identity_client.create_api_key_credential_provider(
+    name="nasa-api-key",
+    apiKey=nasa_api_key,   # the real secret, given exactly once
+)
+credential_provider_arn = response["credentialProviderArn"]
+```
+
+That call stores the key encrypted in AWS Secrets Manager — Identity
+doesn't reimplement secret storage, it wraps it — and hands back an ARN.
+From then on the ARN is the only thing that appears anywhere: in the
+target config, in logs, anywhere. The literal key value never does.
+
+When an agent calls a gateway tool, the gateway matches the call to its
+target, resolves that target's credential-provider ARN against Identity,
+and injects the result at whichever location the target declared
+(`QUERY_PARAMETER` / `api_key` in the example above; a header for others).
+For a plain API-key provider that resolution is a straight Secrets
+Manager fetch. Swap in an OAuth2 provider instead and it's more than a
+fetch: Identity runs an actual grant against a token endpoint, caches the
+resulting access token, and refreshes it before it expires — active
+protocol work, not a passive lookup.
+
+Both of those are still a single shared identity, though — every caller
+hitting that target goes out to the backend as the same key or the same
+OAuth client, and the backend has no way to tell them apart. Genuine
+per-user access needs a third shape: an OAuth provider with
+`grantType: TOKEN_EXCHANGE` and `on_behalf_of`, which takes the *caller's
+own inbound JWT* and exchanges it for a downstream token scoped to that
+specific user, rather than attaching a fixed credential at all. That only
+works when inbound auth to the gateway is JWT-based to begin with (there
+has to be a caller identity to exchange) and the backend itself supports
+token exchange (RFC 8693) — an API-key-only backend has no concept of
+"which user," so there's nothing to retrofit per-user access onto no
+matter how the gateway target is configured.
+
+It's worth being honest about what this buys over just putting the key in
+Secrets Manager or SSM Parameter Store directly and having the agent fetch
+it. Storage-wise, nothing — that's literally where the API-key provider
+puts it. The difference is where the fetch-and-attach happens. Fetch it
+yourself and the plaintext key passes through the agent's own process —
+the same process handling the conversation and running model-directed
+tool code — if only for the moment between the `GetSecretValue` call and
+attaching it to a request; a compromised or misdirected agent is a real
+path for that value to leak. Route it through Gateway and the agent never
+receives the key at all — the fetch and the injection both happen on the
+gateway's side of the hop, at a location pinned by the target config
+rather than whatever a handler happens to do with a value it holds. For a
+static key, that's the entire gap: not better storage, just one less
+process the secret ever has to pass through. For OAuth token exchange, the
+gap is bigger, because Secrets Manager has no equivalent of a grant flow
+at all — that part is real protocol work Gateway is doing for you, not
+storage with extra steps.
+
 The search half works the same way as any other tool: a gateway created
 with search enabled stands up a vector store behind the scenes, embeds
 every attached tool's name and description into it, and exposes one more
