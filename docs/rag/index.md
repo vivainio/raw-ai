@@ -221,3 +221,30 @@ The corpus is small enough and the queries lexical enough that the
 tool-call loop wins outright, and whatever docstring a human already
 wrote for their own benefit does double duty as the retrieval signal —
 no separate embedding pipeline required.
+
+## Older than tool calling
+
+Everything above treats retrieval as one tool among others, callable
+mid-conversation the same way `Bash` or `Grep` is. That's not how the term
+started. "RAG" comes from a 2020 paper — "Retrieval-Augmented Generation
+for Knowledge-Intensive NLP Tasks" — written well before commercial LLM
+APIs offered reliable function calling at all, which didn't become
+standard until around 2023. In 2020 there was no loop to put a search step
+inside. The only shape available was retrieve first, generate second,
+done — exactly the one-shot pipeline this chapter calls the alternative.
+
+That history is most of the reason RAG gets treated as a discipline of its
+own — chunking strategies, reranking models, vector database vendors,
+entire job titles — rather than what it structurally is: a search step,
+wired up either as fixed code that runs before the model or as a tool the
+model calls when it decides to. The vocabulary and tooling built up around
+it during the years before agents could call tools has stuck around even
+though the constraint that produced it — no loop to put search inside —
+mostly stopped applying once function calling shipped. Meeting the term
+today, after tool-calling agents were already normal, gives a reader every
+reason to assume "RAG" names something as fundamental as embeddings or
+attention. It names a search step from an era when there was nowhere else
+to put one, plus the infrastructure built to make that one, fixed search
+step as good as possible — chunking, embedding, ranking — which is still
+exactly what's running inside the tool call. It's just no longer stuck
+running once, up front, with no way back.
