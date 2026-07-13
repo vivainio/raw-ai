@@ -1,0 +1,12 @@
+/* Cover/hero image on the landing page: full content width, gently rounded,
+   with a subtle frame so it sits cleanly above the intro text. */
+.cover-image img,
+img.cover-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.4rem;
+  margin: 0.5em 0 1.2em;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
