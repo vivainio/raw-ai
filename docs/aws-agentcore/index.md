@@ -45,6 +45,16 @@ calls, and not fit a 15-minute hard ceiling. If you've ever tried to wedge
 a LangGraph loop into Lambda and hit that ceiling, Runtime is the answer
 to that specific problem, not a new idea.
 
+You still bring your own container. Build a Docker image (ARM64 only —
+build it on x86 and dependencies fail silently at runtime), expose
+`POST /invocations` and `GET /ping` on port 8080, push it to ECR. Runtime
+pulls that image into the microVM per session. This isn't an escape hatch
+for "custom environments" — it's the default shape of every agent you
+deploy to it. What AWS is selling isn't a way to avoid packaging your own
+container; it's what happens to that container once it's running:
+per-session isolation, fast cold starts, and a bill measured in vCPU- and
+GB-seconds instead of a fixed instance.
+
 **Browser** and **Code Interpreter** bill at the *exact same* vCPU-hour
 and GB-hour rates as Runtime. That's the tell — they're not bespoke
 products, they're Runtime with a different container image and a product
