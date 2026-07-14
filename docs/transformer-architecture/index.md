@@ -54,89 +54,97 @@ receives.
 
 ## The transformer block, stacked N times
 
-Everything from here on happens inside a **layer** (also called a
-**block**), and a model is a stack of identical ones — "70B" and "8B"
-models of the same family often differ mainly in how many layers are
-stacked and how wide each vector is, not in what each layer does. Each
-layer has two sub-layers, applied in sequence:
+Everything from here on happens inside one repeated unit (technical name:
+**layer**, or **block**), and a model is just this same unit stacked over
+and over — dozens of times, for current frontier models. Two model sizes
+in the same family, like "8B" and "70B," usually differ mainly in how many
+times this unit repeats and how big the vectors flowing through it are,
+not in what the unit itself does. Each repetition does two things, in
+order:
 
-1. **Self-attention** — lets each position mix in information from other
-   positions.
-2. **Feed-forward (MLP)** — transforms each position's vector on its own,
-   no mixing across positions.
+1. Let every word look around and pull in relevant information from the
+   other words (technical name: **self-attention**).
+2. Do some private processing on each word's vector by itself, with no
+   looking around at all (technical name: **feed-forward network**, or
+   **MLP**).
 
-Both sub-layers are wrapped the same way: the sub-layer's output is added
-back to its input (a **residual connection**) and the result is rescaled
-(**layer normalization**) before moving on. Stack enough of these — dozens,
-for current frontier models — and you have the network.
+After each of those two steps, the unit also keeps a copy of what went in
+and adds it back onto what comes out, so information doesn't get lost
+passing through so many repetitions (technical name: **residual
+connection**), and nudges the numbers back into a sane, consistent range
+before moving on (technical name: **layer normalization**). Stack enough
+of these repetitions and you have the network.
 
 ## Self-attention: query, key, value
 
-This is the mechanism the [Inference](../inference/index.md#the-kv-cache)
-chapter's KV cache is caching, and it's the subject of the paper that gave
-the whole architecture its name — Vaswani et al.'s 2017 *Attention Is All
-You Need*. Mechanically, it's three learned projections of every position's
-vector:
+This is the "look around" step, and it's also the reason the whole
+architecture is called a *transformer* in the first place — from the 2017
+paper that introduced it, *Attention Is All You Need*.
 
-- **Query** — what this position is looking for
-- **Key** — what every position (including itself) offers, as a label
-- **Value** — what every position offers, as content
+For every word, the network builds three things out of that word's
+vector: something describing what it's looking for, something describing
+what it has to offer as a label, and something describing what it has to
+offer as actual content (technical names, respectively: **query**,
+**key**, **value**). Every word then compares what it's looking for
+against every other word's label, turns those comparisons into a set of
+relative importance scores (technical name: **softmax**), and blends in
+the content from every other word weighted by those scores. A strong
+match between one word's "looking for" and another word's "label" means
+that other word's content gets weighted heavily. That's the whole
+mechanism — no memory of past sentences, no fixed nearby-words-only
+window, just a learned sense of which words matter to which.
 
-For a given position, its query vector is dotted against every position's
-key vector, producing one score per position; those scores go through a
-softmax (turning them into positive weights that sum to 1); the position's
-new vector is the weighted sum of every position's value vector, using
-those weights. High score between a query and a key means "attend to this
-position strongly." That's the entire mechanism — no recurrence, no fixed
-window, just a learned notion of relevance between every pair of
-positions.
-
-**Multi-head** attention runs several independent copies of this (each
-with its own learned Q/K/V projections) in parallel, then concatenates the
-results. Nothing forces the heads to specialize in any particular way, but
-in practice different heads end up picking up on different kinds of
-relationships — a head can end up tracking adjacent-word syntax while
-another tracks a pronoun back to what it refers to several sentences
-earlier — as a byproduct of training, not a design choice. This is also
-why the K and V vectors the Inference chapter's KV cache stores exist in
-the first place: they're the output of the key and value projections
-described here, one pair per position per layer.
+The network doesn't do this once — it runs several independent copies of
+this comparison side by side, each with its own separate "looking
+for / label / content," then combines the results (technical name:
+**multi-head attention**). Nothing designs what each copy ends up good
+at, but in practice they specialize anyway, purely as a side effect of
+training — one might end up tracking which earlier word a pronoun refers
+to, another might track nearby grammar. Whatever gets computed here as
+each word's "label" and "content" is exactly what the [Inference
+chapter's](../inference/index.md#the-kv-cache) KV cache stores — one pair
+per word, per repetition of this whole block.
 
 ## Feed-forward (MLP): the other sub-layer
 
-After attention mixes information across positions, the feed-forward
-sub-layer processes each position's resulting vector independently — the
-same two-layer transformation applied identically to every position, with
-no position ever looking at another one here. This sub-layer usually holds
-the majority of a model's parameters; scaling a model up often means
-widening this part more than any other. Where attention answers "which
-other positions matter," the feed-forward block is where most of the
-actual per-token transformation happens.
+After the "look around" step blends in context from other words, each
+word's resulting vector goes through a second step done entirely on its
+own — no comparing to other words at all, just reshaping that one vector
+(technical name: **feed-forward network**, or **MLP**). This step usually
+holds the majority of a model's total learned weights, and when a model
+family scales up, this is often the part that grows the most. If the
+first step decides which other words matter, this second step is where
+most of the actual per-word transformation happens.
 
 ## Residuals and layer norm: why depth doesn't collapse
 
-Stacking dozens of layers naively — each one replacing its input outright —
-makes models effectively untrainable; gradients either vanish or explode
-propagating back through that many steps. Two fixes, applied around both
-sub-layers: the sub-layer's output is *added* to its input rather than
-replacing it (so there's always a direct path for gradient — and for
-information — to skip the sub-layer entirely), and layer normalization
-rescales activations back to a consistent range before the next sub-layer
-sees them. Neither changes what the network can compute; both are why a
-network this deep can be trained at all.
+None of this works if dozens of these two-step repetitions are stacked
+naively, each one throwing away and fully replacing what came in — the
+numbers involved in training blow up or shrink to nothing before they can
+be adjusted properly. Two small fixes prevent that, applied after both
+steps in every repetition: instead of discarding the input, it gets added
+onto the new output (technical name: **residual connection**, or **skip
+connection**), leaving a direct, untouched path all the way through; and
+the resulting numbers get rescaled to a consistent range before continuing
+(technical name: **layer normalization**). Neither trick changes what the
+network is capable of computing — they only make it possible to actually
+train something this deep in the first place.
 
 ## From last layer to logits
 
-After the final layer, only the last position's vector matters for
-predicting the next token (every earlier position's final vector goes
-unused — its work was done as a key/value source for the positions after
-it). That vector gets projected back to vocabulary size — the reverse of
-the embedding step, and often literally the same weight matrix, transposed
-— producing one number per vocabulary entry. Those numbers are the
-**logits**: exactly the "score for every entry in the vocabulary" the
-Inference chapter's sampling step (temperature, top-p, top-k) takes as
-input. Embedding in, logits out — everything in this chapter is what
-happens in between.
+After the last repetition, only the very last word's vector actually
+matters — that's the one being asked to predict what comes next (every
+earlier word's final vector already did its job, feeding its label and
+content into later words along the way). That last vector gets converted
+from "one big vector" back into "one number per vocabulary entry" —
+reversing the very first embedding step, often using literally the same
+lookup table, just applied backwards. Those numbers are the raw
+next-token scores (technical name: **logits**) — exactly the "score for
+every vocabulary entry" that the [Inference
+chapter's](../inference/index.md) sampling step (temperature, top-p,
+top-k) turns into an actual chosen word. Vocabulary lookup in, one score
+per vocabulary entry out — everything in between is what this chapter has
+been describing.
 
 ## Terms, in one line each
 
