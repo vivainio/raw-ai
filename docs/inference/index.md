@@ -91,8 +91,10 @@ decode step per token, just tokens you don't see.
 ## The KV cache
 
 Attention — the mechanism that lets a token's computation depend on every
-earlier token — needs a key and value vector for every prior position at
-every layer. Recomputing those from scratch at each new decode step would
+earlier token, covered in [Transformer
+Architecture](../transformer-architecture/index.md#self-attention-query-key-value)
+— needs a key and value vector for every prior position at every layer.
+Recomputing those from scratch at each new decode step would
 mean step *t* redoes work already done at steps 1 through *t-1*, making
 total cost scale quadratically with output length. Instead, every key and
 value vector gets computed once and kept in GPU memory — the **KV
