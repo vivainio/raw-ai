@@ -35,7 +35,7 @@ else — which is the next section.
 
 ## Positional encoding: order isn't free
 
-Attention (next section) computes, for each position, a weighted mix of
+Attention (covered under Self-attention below) computes, for each position, a weighted mix of
 every other position's vectors — and that computation is symmetric with
 respect to order. Left unmodified, the model would see "dog bites man" and
 "man bites dog" as the same bag of tokens. So position information gets
