@@ -30,6 +30,7 @@ nav = [
   { "Agent Memory" = "agent-memory/index.md" },
   { "Theory: Inference" = "inference/index.md" },
   { "Theory: Tokenization" = "tokenization/index.md" },
+  { "Theory: Transformer Architecture" = "transformer-architecture/index.md" },
   { "RAG" = "rag/index.md" },
   { "Prompt Caching" = "llm-caching/index.md" },
   { "Hosting: AWS Bedrock" = "aws-bedrock/index.md" },
