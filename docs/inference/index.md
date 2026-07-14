@@ -15,22 +15,16 @@ This chapter is about that loop.
 
 ## Tokens, not words
 
-Text going in gets cut into tokens before the model ever sees it — not
-words, not characters, but chunks from a fixed vocabulary the model was
-trained with (tens of thousands to a few hundred thousand entries,
-depending on the model). `unbelievable` might be one token or three
-(`un`, `believ`, `able`) depending on what showed up often enough in
-training to earn its own slot; common English words are usually one token,
-rare words and most non-English text get split finer, code and whitespace
-split differently again. As a rough rule of thumb for English prose, one
-token is about four characters — good enough for estimating context usage,
-not for anything exact.
-
-Every number quoted for context window size, pricing, or "tokens used" is
-counted in these units, not characters or words. That's why the same
-sentence in French can cost noticeably more tokens than in English, and
-why a wall of JSON (lots of punctuation, lots of repeated key names) tends
-to tokenize worse than the equivalent prose would.
+Text going in gets cut into tokens before the model ever sees it — chunks
+from a fixed vocabulary, not words or characters. As a rough rule of thumb
+for English prose, one token is about four characters — good enough for
+estimating context usage, not for anything exact. Every number quoted for
+context window size, pricing, or "tokens used" is counted in these units.
+Why the split lands where it does, and why that same rule of thumb falls
+apart for code and non-English text, is the subject of the
+[Tokenization](../tokenization/index.md) chapter — the loop this chapter
+covers starts one step later, with a sequence of token IDs already in
+hand.
 
 ## One forward pass, one token
 
