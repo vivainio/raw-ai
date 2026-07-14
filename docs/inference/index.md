@@ -96,8 +96,10 @@ Generating the reply can't use the same trick. Token 50 depends on token 49
 actually having been sampled first — there's no way to compute it in
 advance. So generation, called **decode**, runs one sequential step per
 output token, each step doing comparatively little compute but still
-paying the cost of moving the model's weights through memory — it's
-**memory-bound**, the opposite bottleneck from prefill's. That asymmetry
+paying the cost of streaming the model's weights out of GPU memory into
+its compute cores — it's **memory-bound**, bottlenecked on memory
+bandwidth rather than compute, the opposite of prefill's problem. That
+asymmetry
 is the mechanical reason a 3,000-token prompt with a 50-token reply is fast
 and cheap, while a 200-token prompt asking for a 3,000-token answer is slow
 and expensive in comparison — the bottleneck was never the input, it's the
