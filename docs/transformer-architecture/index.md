@@ -27,19 +27,30 @@ That per-token vector is all the network has to work with going in. Every
 other term below describes a transformation applied to a stack of these
 vectors, one per position in the sequence.
 
+Notice what the embedding table doesn't know: position. Row *n* is keyed on
+token identity alone, so the same token occupying position 3 and position
+300 in the sequence starts out as the exact same vector. Whatever tells the
+network where a token sits in the sequence has to come from somewhere
+else — which is the next section.
+
 ## Positional encoding: order isn't free
 
 Attention (next section) computes, for each position, a weighted mix of
 every other position's vectors — and that computation is symmetric with
 respect to order. Left unmodified, the model would see "dog bites man" and
 "man bites dog" as the same bag of tokens. So position information gets
-injected explicitly: each position's embedding is combined with a
-position-dependent signal before (or during) attention. Older models added
-a fixed or learned vector per position; most current frontier models use
-**RoPE** (rotary position embedding), which rotates the query and key
-vectors by an angle that depends on position instead of adding anything.
-Different mechanism, same job: without it, position is information the
-model never receives.
+injected explicitly, and *where* it gets injected depends on the mechanism.
+Older models added a fixed or learned position vector directly onto the
+embedding, before the first layer — so the embedding itself became
+position-dependent right there, by having something else summed into it.
+Most current frontier models use **RoPE** (rotary position embedding)
+instead, which never touches the embedding at all: it rotates the query and
+key vectors — derived from the embedding inside attention, at every layer —
+by an angle that depends on position. Different mechanism, same job, but
+under RoPE the token embedding itself stays position-agnostic all the way
+through; only its downstream projections carry position information.
+Either way, without this step, position is information the model never
+receives.
 
 ## The transformer block, stacked N times
 
