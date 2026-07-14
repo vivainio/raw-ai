@@ -61,26 +61,50 @@ tokens *means* — plain text to show you, or JSON to parse into a tool
 call — is a decision the harness makes afterward, not something the
 decoding loop is aware of.
 
+## Prefill: one pass over the whole prompt
+
+Before anything gets generated, the model has to run the prompt through
+the network at least once — turn "everything so far" into the internal
+state needed to predict the first output token. Every position in the
+prompt already has a known token ID, so this step, called **prefill**,
+isn't sequential the way generation is: for each layer, the query, key,
+and value vectors for every position get computed in the same batched
+matrix multiply, and attention for all positions runs in parallel too. A
+causal mask — not a processing order — is what stops position *i* from
+attending to positions after it: the future positions are still computed
+alongside everything else, then zeroed out of position *i*'s weighted sum.
+One pass through the network, over the whole prompt at once, is enough.
+
+That pass produces two things, not one. The obvious one is the logits
+needed to sample the first output token. The other is a byproduct: a key
+and value vector for every prompt position, at every layer, computed along
+the way. Those vectors are exactly what the KV cache (next section) starts
+out holding — prefill doesn't just get the first token ready, it populates
+the cache that every subsequent decode step is going to read from.
+
+Because prefill is doing large, batched matrix multiplications across
+every position at once, it's **compute-bound**: its cost tracks available
+GPU FLOPs and scales with how long the prompt is, not with how the GPU's
+memory bandwidth happens to be doing. That's also why "time to first
+token" — the latency a spinner is covering for, before any text appears —
+is essentially "how long prefill took": nothing gets sampled until this
+one pass over the whole prompt finishes.
+
 ## Why the prompt is fast and the answer is slow
 
-Running the model over a sequence of tokens the model already has in
-hand — the prompt — can happen in one pass, because every position's input
-is already known and the matrix multiplications for all of them can run in
-parallel. This is called **prefill**, and it's GPU-efficient: lots of
-compute, done all at once.
-
-Generating the reply can't do that trick. Token 50 depends on token 49
+Generating the reply can't use the same trick. Token 50 depends on token 49
 actually having been sampled first — there's no way to compute it in
 advance. So generation, called **decode**, runs one sequential step per
 output token, each step doing comparatively little compute but still
-paying the cost of moving the model's weights through memory. That
-asymmetry is the mechanical reason a 3,000-token prompt with a 50-token
-reply is fast and cheap, while a 200-token prompt asking for a 3,000-token
-answer is slow and expensive in comparison — the bottleneck was never the
-input, it's the number of sequential decode steps the output requires.
-It's also why extended-thinking / reasoning output inflates latency more
-than an equivalent amount of visible reply text would: it's still one
-decode step per token, just tokens you don't see.
+paying the cost of moving the model's weights through memory — it's
+**memory-bound**, the opposite bottleneck from prefill's. That asymmetry
+is the mechanical reason a 3,000-token prompt with a 50-token reply is fast
+and cheap, while a 200-token prompt asking for a 3,000-token answer is slow
+and expensive in comparison — the bottleneck was never the input, it's the
+number of sequential decode steps the output requires. It's also why
+extended-thinking / reasoning output inflates latency more than an
+equivalent amount of visible reply text would: it's still one decode step
+per token, just tokens you don't see.
 
 ## The KV cache
 
