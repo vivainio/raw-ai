@@ -35,6 +35,7 @@ nav = [
   { "Prompt Caching" = "llm-caching/index.md" },
   { "Hosting: AWS Bedrock" = "aws-bedrock/index.md" },
   { "Hosting: AWS AgentCore" = "aws-agentcore/index.md" },
+  { "Models: Reading the Spec Sheet" = "reading-model-specs/index.md" },
   { "Frameworks: Pydantic AI" = "pydantic-ai/index.md" },
   { "Frameworks: Strands Agents" = "strands-agents/index.md" },
   { "Frameworks: Microsoft Agent Framework" = "microsoft-agent-framework/index.md" },

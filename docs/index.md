@@ -70,6 +70,9 @@ directory names and file formats, not the shape of the thing.
 - [Hosting: AWS AgentCore](aws-agentcore/index.md) — pulling apart AWS's
   bundle of a dozen billed services to see which parts are genuinely new
   and which are existing AWS primitives with an agent-shaped label.
+- [Models: Reading the Spec Sheet](reading-model-specs/index.md) — what
+  parameter counts, context windows, and benchmark tables actually
+  measure, and what a vendor's own comparison chart is likely hiding.
 - [Frameworks: Pydantic AI](pydantic-ai/index.md) — a Python-native agent
   library: typed dependencies and structured output, deferred tools for
   pausing on approval, and how much of AgentCore's surface stays manual
