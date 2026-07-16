@@ -73,6 +73,10 @@ directory names and file formats, not the shape of the thing.
 - [Models: Reading the Spec Sheet](reading-model-specs/index.md) — what
   parameter counts, context windows, and benchmark tables actually
   measure, and what a vendor's own comparison chart is likely hiding.
+- [Models: Lineage and Licenses](model-lineage-licenses/index.md) — a
+  short history from RNNs through the transformer, GPT, and RLHF, plus
+  what "open weight" doesn't tell you about what you're allowed to do
+  with a model.
 - [Frameworks: Pydantic AI](pydantic-ai/index.md) — a Python-native agent
   library: typed dependencies and structured output, deferred tools for
   pausing on approval, and how much of AgentCore's surface stays manual
