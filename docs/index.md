@@ -77,6 +77,11 @@ directory names and file formats, not the shape of the thing.
   short history from RNNs through the transformer, GPT, and RLHF, plus
   what "open weight" doesn't tell you about what you're allowed to do
   with a model.
+- [Models: Image Generation and Recognition](image-models/index.md) —
+  why vision and image generation are different machinery under one
+  marketing label: how patching turns an image into billable tokens,
+  what recognition reliably gets wrong, and diffusion versus
+  autoregressive generation.
 - [Frameworks: Pydantic AI](pydantic-ai/index.md) — a Python-native agent
   library: typed dependencies and structured output, deferred tools for
   pausing on approval, and how much of AgentCore's surface stays manual
