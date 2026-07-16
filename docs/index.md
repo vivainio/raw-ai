@@ -48,6 +48,10 @@ directory names and file formats, not the shape of the thing.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
+- [Theory: Machine Learning Before LLMs](machine-learning-before-llms/index.md) —
+  sixty years of feature engineering, classical models, and word embeddings
+  before deep learning, and why tabular data still belongs to gradient-boosted
+  trees rather than transformers.
 - [Theory: Inference](inference/index.md) — tokens, the autoregressive
   decode loop, why the prompt is fast and the reply is slow, and why the
   KV cache is the same mechanism behind context limits, prompt caching,

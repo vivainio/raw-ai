@@ -13,7 +13,9 @@ story.
 
 ## A short history
 
-Before transformers, sequence models were recurrent: an RNN or LSTM read
+This picks up where [Theory: Machine Learning Before
+LLMs](../machine-learning-before-llms/index.md) leaves off. Before
+transformers, sequence models were recurrent: an RNN or LSTM read
 a sentence one token at a time, carrying a running summary forward step
 by step. That worked, within limits — the running summary degraded over
 long sequences (the "vanishing gradient" problem), and because each step
