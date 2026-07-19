@@ -30,14 +30,15 @@ counts, and for a concrete reason: you're downloading the weights, and
 the count tells you what GPU memory you need to run them. The number
 serves the reader there in a way it doesn't for a hosted API.
 
-Where a count does get published, mixture-of-experts architectures split
-it into two figures that get conflated constantly: total parameters and
-active parameters per token. A model can list a large total count while
-only routing each token through a fraction of it — active parameter count
-tracks much closer to inference cost and latency than total does. Seeing
-one big number in a headline without total-vs-active broken out is a
-sign to go find the breakdown before treating it as comparable to a
-dense model's parameter count.
+Where a count does get published,
+[mixture-of-experts](../transformer-architecture/index.md#mixture-of-experts-not-every-parameter-runs-for-every-token)
+architectures split it into two figures that get conflated constantly:
+total parameters and active parameters per token. A model can list a large
+total count while only routing each token through a fraction of it — active
+parameter count tracks much closer to inference cost and latency than total
+does. Seeing one big number in a headline without total-vs-active broken
+out is a sign to go find the breakdown before treating it as comparable to
+a dense model's parameter count.
 
 ## Context window: advertised max, not effective use
 

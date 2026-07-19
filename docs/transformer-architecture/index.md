@@ -11,7 +11,8 @@ produces scores. This chapter is what's inside that box — kept light, on
 purpose: the goal here isn't to derive the architecture, it's to give the
 handful of terms you'll see in every model card, paper abstract, and
 "how LLMs work" diagram an actual referent, so they stop being vocabulary
-you nod along to.
+you nod along to. The focus is the decoder-only, autoregressive transformer
+behind most text-generating LLMs.
 
 ## Embeddings: a token ID is not a vector, yet
 
@@ -35,22 +36,21 @@ else — which is the next section.
 
 ## Positional encoding: order isn't free
 
-Attention (covered under Self-attention below) computes, for each position, a weighted mix of
-every other position's vectors — and that computation is symmetric with
-respect to order. Left unmodified, the model would see "dog bites man" and
-"man bites dog" as the same bag of tokens. So position information gets
+Attention (covered under Self-attention below) works by comparing token
+representations; those comparisons don't by themselves say whether two
+tokens are one position or a hundred positions apart. A decoder's causal
+mask tells it which tokens came earlier, but the model still needs position
+information to represent order and distance properly. That information gets
 injected explicitly, and *where* it gets injected depends on the mechanism.
-Older models added a fixed or learned position vector directly onto the
-embedding, before the first layer — so the embedding itself became
-position-dependent right there, by having something else summed into it.
-Most current frontier models use **RoPE** (rotary position embedding)
-instead, which never touches the embedding at all: it rotates the query and
-key vectors — derived from the embedding inside attention, at every layer —
-by an angle that depends on position. Different mechanism, same job, but
-under RoPE the token embedding itself stays position-agnostic all the way
-through; only its downstream projections carry position information.
-Either way, without this step, position is information the model never
-receives.
+
+Older models added a fixed or learned position vector directly to each
+token embedding before the first layer. Most current frontier models use
+**RoPE** (rotary position embedding) instead: at every layer, it rotates
+the query and key vectors derived from the current token representations
+by angles that depend on position. RoPE leaves the initial embedding lookup
+unchanged, but its effect flows into the position-dependent representations
+produced by attention. Different mechanism, same job: giving attention a
+usable signal about where tokens occur in the sequence.
 
 ## The transformer block, stacked N times
 
@@ -59,21 +59,21 @@ Everything from here on happens inside one repeated unit (technical name:
 and over — dozens of times, for current frontier models. Two model sizes
 in the same family, like "8B" and "70B," usually differ mainly in how many
 times this unit repeats and how big the vectors flowing through it are,
-not in what the unit itself does. Each repetition does two things, in
+not in what the unit itself does. Each repetition does two main things, in
 order:
 
-1. Let every word look around and pull in relevant information from the
-   other words (technical name: **self-attention**).
-2. Do some private processing on each word's vector by itself, with no
+1. Let every token look back and pull in relevant information from itself
+   and earlier tokens (technical name: **self-attention**).
+2. Do some private processing on each token's vector by itself, with no
    looking around at all (technical name: **feed-forward network**, or
    **MLP**).
 
-After each of those two steps, the unit also keeps a copy of what went in
-and adds it back onto what comes out, so information doesn't get lost
-passing through so many repetitions (technical name: **residual
-connection**), and nudges the numbers back into a sane, consistent range
-before moving on (technical name: **layer normalization**). Stack enough
-of these repetitions and you have the network.
+Each step sits on a **residual connection** that adds the step's output to
+what came in, preserving a direct path through the stack. **Layer
+normalization** also keeps the representations at a manageable scale. The
+exact ordering varies: the original transformer normalized after each
+residual addition, while most current LLMs normalize before each attention
+or MLP step. Stack enough of these blocks and you have the network.
 
 ## Self-attention: query, key, value
 
@@ -81,68 +81,89 @@ This is the "look around" step, and it's also the reason the whole
 architecture is called a *transformer* in the first place — from the 2017
 paper that introduced it, *Attention Is All You Need*.
 
-For every word, the network builds three things out of that word's
-vector: something describing what it's looking for, something describing
-what it has to offer as a label, and something describing what it has to
-offer as actual content (technical names, respectively: **query**,
-**key**, **value**). Every word then compares what it's looking for
-against every other word's label, turns those comparisons into a set of
-relative importance scores (technical name: **softmax**), and blends in
-the content from every other word weighted by those scores. A strong
-match between one word's "looking for" and another word's "label" means
-that other word's content gets weighted heavily. That's the whole
-mechanism — no memory of past sentences, no fixed nearby-words-only
-window, just a learned sense of which words matter to which.
+For every token, the network builds three things out of its current
+representation: something describing what it's looking for, something
+describing what it has to offer as a label, and something describing what
+it has to offer as actual content (technical names, respectively:
+**query**, **key**, **value**). Each token compares its query against the keys of
+itself and every earlier token; a **causal mask** prevents it from looking
+at later tokens. Those comparisons become relative importance weights
+(via **softmax**), which are used to blend the corresponding values. A
+strong match between one token's query and another token's key gives that
+other token's value more weight. There is no fixed nearby-tokens-only
+window in standard full attention, just a learned sense of which earlier
+tokens matter to which.
 
 The network doesn't do this once — it runs several independent copies of
 this comparison side by side, each with its own separate "looking
 for / label / content," then combines the results (technical name:
 **multi-head attention**). Nothing designs what each copy ends up good
 at, but in practice they specialize anyway, purely as a side effect of
-training — one might end up tracking which earlier word a pronoun refers
+training — one might end up tracking which earlier token a pronoun refers
 to, another might track nearby grammar. Whatever gets computed here as
-each word's "label" and "content" is exactly what the [Inference
+each token's "label" and "content" is exactly what the [Inference
 chapter's](../inference/index.md#the-kv-cache) KV cache stores — one pair
-per word, per repetition of this whole block.
+per token, per attention head, per layer (with implementation details that
+can reduce how many distinct key/value heads are stored).
 
 ## Feed-forward (MLP): the other sub-layer
 
-After the "look around" step blends in context from other words, each
-word's resulting vector goes through a second step done entirely on its
-own — no comparing to other words at all, just reshaping that one vector
-(technical name: **feed-forward network**, or **MLP**). This step usually
-holds the majority of a model's total learned weights, and when a model
-family scales up, this is often the part that grows the most. If the
-first step decides which other words matter, this second step is where
-most of the actual per-word transformation happens.
+After the "look around" step blends in context from earlier tokens, each
+token's resulting vector goes through a second step done entirely on its
+own — no comparing to other tokens at all, just transforming that one
+vector (technical name: **feed-forward network**, or **MLP**). This step
+usually holds the majority of a model's total learned weights, and when a
+model family scales up, this is often the part that grows the most. If the
+first step decides which other tokens matter, this second step is where
+most of the actual per-token transformation happens.
+
+## Mixture of experts: not every parameter runs for every token
+
+In a dense transformer, each layer has one MLP that processes every token.
+A **mixture-of-experts** model replaces that MLP with several
+separate MLPs, called **experts**, plus a small learned **router** that
+chooses which expert or experts should process each token at that layer.
+Despite the name, an expert is not usually a complete model or a
+hand-assigned specialist in subjects like code or medicine — it is just
+one alternative set of feed-forward weights, and any specialization
+emerges during training.
+
+Only the selected experts run for a given token. This lets the model have
+many more parameters in total without using all of them for every token:
+for example, a layer might contain eight experts while routing each token
+through only two, though the numbers vary by architecture. That is why MoE
+model specifications often publish both **total parameters** (all model
+weights, including every expert) and **active parameters** (the shared
+weights plus the selected experts used for one token). Total parameters
+describe the model's overall capacity and storage requirements; active
+parameters are more closely related to the computation required during
+inference. The tradeoff is extra routing and communication complexity,
+especially when the experts are spread across multiple accelerators.
 
 ## Residuals and layer norm: why depth doesn't collapse
 
-None of this works if dozens of these two-step repetitions are stacked
-naively, each one throwing away and fully replacing what came in — the
-numbers involved in training blow up or shrink to nothing before they can
-be adjusted properly. Two small fixes prevent that, applied after both
-steps in every repetition: instead of discarding the input, it gets added
-onto the new output (technical name: **residual connection**, or **skip
-connection**), leaving a direct, untouched path all the way through; and
-the resulting numbers get rescaled to a consistent range before continuing
-(technical name: **layer normalization**). Neither trick changes what the
-network is capable of computing — they only make it possible to actually
-train something this deep in the first place.
+Stacking dozens of transformations makes optimization difficult: every
+layer has to preserve useful information while gradients travel through
+the entire stack during training. A **residual connection** (or **skip
+connection**) makes each sub-layer learn a change to its input rather than
+a complete replacement: its output gets added back to the input, leaving a
+direct path through the network. **Layer normalization** rescales each
+token's representation before or after a sub-layer, depending on the
+architecture, which helps keep training stable. Together these mechanisms
+make very deep transformer stacks practical to optimize.
 
 ## From last layer to logits
 
-After the last repetition, only the very last word's vector actually
-matters — that's the one being asked to predict what comes next (every
-earlier word's final vector already did its job, feeding its label and
-content into later words along the way). That last vector gets converted
-from "one big vector" back into "one number per vocabulary entry" —
-reversing the very first embedding step, often using literally the same
-lookup table, just applied backwards. Those numbers are the raw
-next-token scores (technical name: **logits**) — exactly the "score for
-every vocabulary entry" that the [Inference
+During inference, the representation at the final position is the one
+needed to predict the next token. An output projection converts that vector
+into one number per vocabulary entry; many models share this projection's
+weights with the input embedding table, though they do not have to. Those
+numbers are the raw next-token scores (technical name: **logits**) —
+exactly the "score for every vocabulary entry" that the [Inference
 chapter's](../inference/index.md) sampling step (temperature, top-p,
-top-k) turns into an actual chosen word. Vocabulary lookup in, one score
+top-k) turns into an actual chosen token. During training, the same
+projection is normally applied at every position so the model can learn
+all next-token predictions in parallel. Vocabulary lookup in, one score
 per vocabulary entry out — everything in between is what this chapter has
 been describing.
 
@@ -161,10 +182,12 @@ been describing.
   position per layer (see [Inference](../inference/index.md#the-kv-cache))
 - **Feed-forward / MLP** — per-position transformation, no cross-position
   mixing, usually most of the parameter count
+- **Mixture of experts (MoE)** — several alternative MLPs plus a learned
+  router that activates only a small subset for each token
 - **Residual connection** — sub-layer output added to its input, not
   replacing it
-- **Layer normalization** — rescales activations to a consistent range
-  between sub-layers
+- **Layer normalization** — rescales each token's representation to help
+  stabilize a deep stack
 - **Logits** — the final per-vocabulary-entry scores fed into sampling
 - **Parameter count** ("7B", "70B") — total learned weights across every
   embedding, projection, and feed-forward matrix in the stack
