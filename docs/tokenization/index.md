@@ -8,27 +8,31 @@ This book's own intro admits that most AI content stalls at "what a token
 is" and never gets past it. Fair — here's the part that usually gets
 skipped: the actual merge algorithm that builds a token vocabulary, why two
 Claude models released eight months apart can tokenize the same sentence
-into a different number of pieces, and why that number is worse for code
-and non-English text than for plain English prose. None of this is
-Claude-specific mechanics dressed up as theory — it's the same algorithm
-class (byte-pair encoding, or a close variant) behind every current
-frontier model's tokenizer, Claude's included.
+into a different number of pieces, and why that number can be higher for
+code and non-English text than for plain English prose. The worked example uses
+byte-pair encoding (BPE), one common tokenizer family. Current models also
+use related schemes such as WordPiece, Unigram, and vendor-specific
+variants, so the exact training algorithm and boundaries differ even when
+the practical consequences are similar.
 
 ## A token is not a word, and not fixed in advance
 
-The model never reads characters. Every request is converted to a sequence
-of integers, each one an index into a fixed vocabulary — tens of thousands
+The model is not given a raw string or one input position per character.
+Every request is converted to a sequence of integers, each one an index
+into a fixed vocabulary — tens of thousands
 to a few hundred thousand entries, depending on the model family. Those
 entries aren't linguistic units chosen by a linguist. They're byte
 sequences chosen by an algorithm that ran once, offline, over a training
 corpus, looking for whatever chunks appeared together often enough to be
 worth a dedicated slot.
 
-The algorithm is byte-pair encoding (BPE): start with every word broken
-into individual characters, find the adjacent pair that occurs most often
-across the whole corpus, merge it into one symbol, and repeat until the
-vocabulary hits its target size. Here it is on the classic four-word toy
-corpus from the original BPE paper — real output, not a hand-typed example:
+In the original subword version of BPE, the algorithm starts with every word
+broken into individual characters, finds the adjacent pair that occurs most
+often across the corpus, merges it into one symbol, and repeats until the
+vocabulary hits its target size. Many modern tokenizers instead start from
+bytes, which guarantees that any Unicode text can be represented without an
+unknown-token fallback. Here is the character-level algorithm on the classic
+four-word toy corpus from the original BPE-for-subwords paper:
 
 ```python
 from collections import Counter
@@ -89,8 +93,10 @@ boundary — is already its own symbol, because "newest" and "widest" pushed
 too, from `lower` plus its own occurrences. Run this over billions of real
 words instead of four toy ones, stop at tens of thousands of merges
 instead of six, and this is the whole algorithm. There's no dictionary, no
-part-of-speech tagging, no notion of a "word" at all going in — only pair
-frequency, over and over, until the budget runs out.
+part-of-speech tagging or linguistic analysis — only word frequencies and
+pair frequencies, over and over, until the budget runs out. Byte-level
+implementations do not require the pre-split words or explicit `</w>` marker
+used by this teaching example.
 
 The consequence that matters: a token is not a property of a string. It's
 a property of a (string, trained vocabulary) pair. Change the vocabulary
@@ -138,48 +144,43 @@ prompts, because the ratio isn't constant across content types.
 
 ## Why code and other languages cost more tokens per character
 
-Merges get created when a pair shows up often enough in the training
-corpus to be worth a slot — and that corpus is overwhelmingly English
-prose. The vocabulary's cheapest, most-compressed entries are common
-English words and word fragments, because those are what the merge
-algorithm saw over and over.
+Merges get created when a pair shows up often enough in the tokenizer's
+training corpus to be worth a slot. If English prose is overrepresented,
+common English words and fragments receive more of those slots and compress
+more efficiently. The size and composition of the corpus matter here; the
+imbalance is not identical across model families.
 
-Code doesn't compress the same way. Indentation runs, camelCase and
-snake_case boundaries, repeated punctuation, and identifiers that don't
-look like English words don't line up with the merge patterns English
-prose produced, so the same visible character count in a source file
-typically breaks into more tokens than it would in a paragraph of prose.
-Non-Latin scripts — Chinese, Japanese, Korean, Hindi, Arabic — see the
-same effect for a more basic reason: the merges that would compress them
-efficiently were never as frequent in the training mix, so encoding often
-falls back toward one token per character, or even per byte, instead of
-per common word-fragment. A sentence that reads as "the same length" to a
-person can cost noticeably more tokens in one script than another. That's
-a property of what the vocabulary was trained on, not of the language
-itself — a tokenizer trained on a different corpus mix would compress
-differently.
+Code may not compress the same way. Indentation, identifier boundaries,
+punctuation, and project-specific names create a different frequency
+distribution from prose. Tokenizers trained with plenty of code can add
+merges for those patterns, so code's token cost is model- and language-
+dependent rather than inherently high.
+
+The same qualification applies across human languages. Scripts or languages
+that occupy less of the tokenizer-training mix tend to receive fewer useful
+merges, and byte-level tokenizers may split one visible character into
+multiple tokens. A sentence that looks the same length to a person can
+therefore cost noticeably more in one language than another. That is a
+property of the tokenizer and its training corpus, not of the language
+itself.
 
 ## What this explains, not just what it costs
 
-The token boundary is also why some famously "dumb" model mistakes aren't
-about reasoning at all. Asking a model to count the letters in
-"strawberry" is hard for the same reason the toy corpus above merged
-`e`+`s` before it ever considered a single letter: the model's input is
-whatever token IDs `straw` + `berry` (or however the trained vocabulary
-happens to split it) turned into — the individual letters were never a
-unit it was shown. Recovering "how many r's" means reasoning about the
-sub-token structure indirectly, not reading characters off a tape the way
-a person would.
+Token boundaries also help explain some famously "dumb" model mistakes.
+If "strawberry" arrives as a few multi-character tokens, the model is not
+given a ready-made sequence with one position per letter. It can still
+learn spelling from text and can often reconstruct the characters, but
+counting them requires an indirect transformation rather than reading one
+letter from each input position. Tokenization makes the task awkward; it
+does not make the characters unavailable in principle.
 
-It's also why trailing whitespace inside a tool call's string parameters
-became a real, documented compatibility break between model generations —
-older Claude models stripped a trailing newline a tool's input string
-carried; 4.5-and-later models started preserving it, because the boundary
-between "text" and "token" isn't the same as the boundary between
-"visible character" and "invisible character." Code that did exact string
-matching against a tool's `input` value (`if name == "foo"`) had to add
-`.rstrip()` to keep working, because a token-level model doesn't
-distinguish `"foo"` from `"foo\n"` the way a naive string comparison does.
+Tokenization does not, however, explain every text-formatting compatibility
+change. Whether a tool-call argument preserves trailing whitespace is a
+property of model behavior and the API's serialization and parsing layers.
+Both `"foo"` and `"foo\n"` are representable as token sequences, and an
+ordinary string comparison correctly treats them as different values. If
+an integration wants to ignore surrounding whitespace, it should normalize
+the input deliberately rather than attribute the difference to tokens.
 
 And it's why context windows, `max_tokens`, and pricing are all denominated
 in tokens rather than characters or words in the first place: tokens are

@@ -8,13 +8,15 @@ Start from something already familiar: full-text search. Grep the corpus,
 or run it through Postgres's `tsvector`, and paste the matching lines into
 the prompt — that's already retrieval-augmented generation, in the literal
 sense of "text fetched at answer time instead of baked into the weights."
-What's usually meant by "RAG" adds exactly one idea on top of that: instead
-of matching shared *words*, the search step matches shared *meaning*, via
-embeddings, so a query and a chunk that share no vocabulary at all can
-still be found relevant.
+What's usually meant by "RAG" often adds vector search: instead of requiring
+shared words, the search step compares learned embeddings, so a query and a
+chunk that share no vocabulary can still rank near each other. Calling this
+"matching meaning" is useful shorthand, but embeddings capture statistical
+similarity, not a guaranteed semantic judgment.
 
-That gap is the whole value proposition. Most real queries don't share
-words with the answer — "how do I get my money back" doesn't contain
+That gap is a major part of the value proposition. Many real queries don't
+share the important words with the answer — "how do I get my money back"
+doesn't contain
 "refund," and a support ticket describing a bug rarely uses the phrasing
 of the changelog entry that fixed it. `grep "money back"` returns nothing;
 a full-text index gets partial credit if stemming happens to line up; an
@@ -22,9 +24,9 @@ embedding of the query lands close to the embedding of the refund-policy
 chunk regardless of phrasing, because it's comparing meaning instead of
 tokens.
 
-It's also the whole limitation, in reverse: embeddings are worse than grep
-at anything exact. An error code, a function name, a SKU — grep finds
-those instantly and for free, and a similarity search can bury an exact
+The limitation appears in reverse on exact identifiers. An error code, a
+function name, or a SKU is a natural lexical-search query: lexical search
+finds it directly and cheaply, while a similarity search can bury an exact
 match under a pile of "semantically close" noise instead of surfacing it
 first. That asymmetry is why systems that actually ship rarely pick one or
 the other — lexical search (BM25, Postgres full-text, plain grep) and
@@ -48,8 +50,10 @@ each doing one specific job:
 2. **Embed** each chunk: run it through an embedding model and keep the
    resulting vector alongside the chunk's text. This happens once, offline,
    before any question is asked.
-3. **Embed the query** the same way, at answer time, and compare it against
-   every stored vector — cosine similarity, ranked, top-k kept.
+3. **Embed the query** with a compatible model at answer time, search the
+   stored vectors using cosine similarity or another configured distance,
+   and keep the top-k candidates. An index usually approximates this search
+   rather than comparing against every vector.
 4. **Assemble**: the k highest-scoring chunks get concatenated into the
    prompt, and the model generates its answer with that text in front of it.
 
@@ -113,7 +117,7 @@ def search_docs(query: str) -> list[str]:
     return retrieve(query, k=3)
 ```
 
-Handed that tool, the model decides *whether* to call it at all, decides
+Handed that tool, the model can decide *whether* to call it at all, decide
 *what query* to send — which doesn't have to be the user's literal
 wording, it can be a reformulation aimed straight at the corpus — and can
 call it again with a different query if the first batch of chunks didn't
@@ -123,19 +127,20 @@ reads it, decides if it's enough, and either answers or asks for more.
 
 That gets you:
 
-- **Cost is conditional.** A question the model can already answer, or one
+- **Retrieval cost is conditional.** A question the model can already answer, or one
   that doesn't touch the corpus at all, skips the tool call entirely
   instead of always paying for a retrieval it doesn't need.
 - **Multi-hop questions work.** "Compare X and Y" can become two
   `search_docs` calls with two different queries in the same turn, each
-  returning its own chunks, instead of one query embedding trying to
+  returning its own chunks, instead of relying on one query embedding to
   represent both halves at once.
 - **A bad retrieval is recoverable.** If the returned chunks don't answer
   the question, the model can reformulate the query and call the tool
   again.
 
-The tool is doing the exact same work as the code in the last section —
-chunking, embedding, the similarity search, any reranking. What changes is
+The tool can expose the same retrieval pipeline as the code in the last
+section — query embedding, search, and any reranking. Chunking and document
+embedding normally happened earlier at index time. What changes is
 *who* decides when it runs and with what query: the model, mid-conversation,
 instead of your code, once, up front.
 
@@ -156,9 +161,10 @@ to react to what came back:
   model produces any output. If the search ranked the wrong chunks
   highest, there's no recovery; the model answers with whatever it got,
   right or wrong.
-- A single query embedding can't represent a question that needs two
-  different lookups — "compare last quarter's revenue to this quarter's"
-  is one question and two retrievals, and a one-shot search only gets one.
+- A naive one-shot implementation sends one query even when the question
+  needs several lookups. Application code can decompose the question or run
+  multiple searches, but then it is taking on orchestration that an agent
+  loop could otherwise perform.
 - Every call pays for retrieval whether the question needs it or not —
   there's no cheap "skip it" path when nothing's deciding whether to
   search in the first place.
@@ -174,27 +180,14 @@ Everything above assumed an English corpus. Code raises a real question:
 does a function need an explicit English explanation sitting next to it
 before embedding search can find it at all?
 
-Not strictly — but the reason raw code embeds at all is worth being
-precise about. Embedding models, code-specific ones included, are trained
-on huge amounts of paired code and text: a docstring above a function, a
-README next to the source it describes, a Stack Overflow answer next to
-the snippet it explains, a commit message next to its diff. That pairing
-is what teaches the model a code↔English correspondence during
-training — tokens placed near tokens they co-occurred with millions of
-times, learned statistically, not the model executing or reasoning about
-what the code does.
-
-Which means that correspondence is carried almost entirely by the code's
-own naming and comments, not its syntax. `def apply_discount(price,
-cost): return price * 0.9 - cost` embeds close to a query like "how do we
-calculate discounts," because `apply_discount`, `price`, and `cost` are
-exactly the tokens that co-occurred with discount-related English during
-training. `def f(a, b): return a * 0.9 - b` runs the identical
-computation and embeds close to nothing useful, since the model has only
-generic arithmetic tokens to go on. Undocumented, badly-named code hits
-the same vocabulary-mismatch wall as the refund example at the top of
-this chapter — there's no natural-language signal in the chunk for
-meaning-based search to find, whatever the code actually does.
+Not strictly. Code-capable embedding models can learn from several signals:
+paired code and natural language, identifiers and comments, and structural
+patterns in the code itself. Names such as `apply_discount` provide a strong
+bridge to an English query about discounts, while `f(a, b)` removes that
+signal and is therefore harder to retrieve. It is too strong to say syntax
+contributes nothing—the arithmetic and control-flow patterns still affect
+the representation—but terse names and missing context make natural-language
+retrieval less reliable.
 
 Two fixes exist for code too terse to carry that signal on its own:
 generate a synthetic one-line summary per function at index time — an
@@ -217,10 +210,10 @@ model doesn't run a similarity search over a vector store — it tries
 `grep -ri refund`, and if that comes up empty, tries `reimburs`, or
 `credit.*back`, reformulating by retry the same way the tool-call section
 above described, just pointed at source instead of a document corpus.
-The corpus is small enough and the queries lexical enough that the
-tool-call loop wins outright, and whatever docstring a human already
-wrote for their own benefit does double duty as the retrieval signal —
-no separate embedding pipeline required.
+For many repositories the corpus is small enough and the queries lexical
+enough that the tool-call loop works well without a vector index. Whatever
+docstring a human already wrote for their own benefit does double duty as
+the retrieval signal—no separate embedding pipeline required.
 
 ## Older than tool calling
 

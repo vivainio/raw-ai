@@ -15,22 +15,22 @@ merge.
 
 ## Recognition: how a vision model reads an image
 
-An image doesn't enter the model as pixels. It's cut into a grid of
-fixed-size patches, each patch run through a vision encoder — typically
-a Vision Transformer (ViT) — that turns it into an embedding, the same
-kind of vector the [tokenization](../tokenization/index.md) chapter
-described for text. Those patch embeddings get projected into the same
-space as text token embeddings and dropped into the model's input
-sequence alongside the prompt, which is what lets a single transformer
-reason over both without a separate "vision module" bolted on the side.
+An image starts as pixels, but a multimodal language model normally does
+not feed raw pixel values straight into its text transformer. A vision
+encoder—often a Vision Transformer (ViT)—divides the image into patches
+and turns them into feature vectors. A projector, resampler, or similar
+adapter then converts those features into a sequence the language model can
+consume alongside text tokens. Architectures differ: some keep a distinct
+vision encoder, while more unified designs share more of the processing.
 
 That patching has a direct, billable consequence: a high-resolution
 image, or a vendor's tiling scheme that splits a large image into
 several sub-images to preserve detail, produces more patches — more
-tokens — than a small or low-resolution one. Image input is priced and
-counted in the same token budget as text, and the conversion rate is
-usually documented per vendor rather than being a fixed constant across
-the industry. An image dropped into a long conversation can quietly
+tokens — than a small or low-resolution one. Providers commonly convert
+this visual work into image-token counts or another resolution-dependent
+billing unit. Whether those units share the text context budget and how
+they are priced is API-specific, not a fixed industry rule. An image
+dropped into a long conversation can quietly
 consume a large share of the context window in a way a wall of text of
 comparable "size" wouldn't.
 
@@ -40,8 +40,11 @@ Frontier vision models are strong, unsurprisingly, at the things a
 transformer trained on internet-scale image-text pairs would be
 expected to be strong at: describing a scene, reading printed or
 handwritten text, answering questions about a chart or a screenshot,
-classifying what kind of document something is. OCR quality on clean
-printed text is close to a solved problem at this point.
+classifying what kind of document something is. OCR on clean printed text
+is often strong, but accuracy still depends on resolution, layout, script,
+typography, and whether the product uses a dedicated OCR stage. "Readable
+in a demo" is not the same as reliable transcription for production
+documents.
 
 Three failure modes show up consistently enough to plan around rather
 than treat as occasional noise:
@@ -62,19 +65,20 @@ than treat as occasional noise:
   subject of the patch grid is easy for the model to miss or
   hallucinate over rather than report as unseen.
 
-None of these are edge cases so much as the direct shadow of how patch-
-based encoding works: the model sees a grid of averaged visual
-information, not a lossless copy of the image, and it answers
-questions the way it answers any other prompt — with the statistically
-plausible response, not a measurement.
+These weaknesses come from several sources: resizing and patching can lose
+detail, language-model decoding favors plausible answers, and generic
+training objectives do not enforce exact counting or coordinates. Patches
+are learned representations rather than simply averaged pixels, but they
+still do not preserve a lossless copy of the source image.
 
-## Generation: two different architectures
+## Generation: two broad approaches
 
 Where recognition converts an image into tokens for a transformer to
-read, generation goes one of two ways, and they don't share machinery.
+read, generation has two prominent approaches. Real products can combine
+them, so these are not mutually exclusive boxes.
 
-**Diffusion models** — Stable Diffusion, Flux, Midjourney's underlying
-approach — start from random noise and run a series of steps that
+**Diffusion models** — including Stable Diffusion and Flux — typically
+start from random noise and run a series of steps that
 predict and subtract a bit of that noise at each step, guided by a text
 encoding (commonly from a CLIP-style model or a separate language
 model) fed in via cross-attention at every step. Most production
@@ -84,35 +88,31 @@ decoder expands the final latent back into pixels — which is most of
 why modern diffusion generation is fast enough to be interactive rather
 than something to leave running for minutes.
 
-**Autoregressive image models** treat the image the same way a language
-model treats text: as a sequence of discrete tokens, predicted one at a
-time, left to right, conditioned on everything generated so far —
-including the surrounding text in the same conversation. This is the
-approach behind native image generation in models like GPT-image and
-Gemini's image output, where the same transformer that handles the
-conversation also produces the image tokens, rather than routing the
-request out to a separate diffusion pipeline.
+**Autoregressive image models** represent an image as a sequence of tokens
+and predict them in an order conditioned on prior tokens and the prompt.
+The order need not correspond literally to pixels from left to right.
+Some native multimodal systems can generate text and image representations
+within one model family, but vendors do not always publish enough
+architecture detail to conclude that the exact same transformer produces
+both or that no diffusion-style decoder is involved.
 
 ## Why the architecture choice matters in practice
 
-Diffusion's strength is raw image quality and speed for a
-self-contained generation task — text-to-image with no prior
-conversational context to track. Its weakness is exactly what's outside
-that scope: instruction-following across multiple edits, keeping a
-character or object consistent across a series of generated images, or
-reasoning about the request the way an LLM reasons about a text prompt.
-The text conditioning is an input to the denoising process, not
-something the model is actively reasoning over.
+Diffusion systems have produced strong image quality and can generate in
+parallel within each denoising step, though they require multiple such
+steps. Their instruction-following depends heavily on the text encoder,
+conditioning design, training data, and any language model placed in front
+of the generator. Diffusion itself does not imply weak editing or poor
+multi-turn consistency; those are properties to test in the complete
+product.
 
-Autoregressive generation's strength is the inverse: because it's the
-same substrate as the LLM handling the conversation, it inherits that
-model's instruction-following and in-context reasoning, which is why it
-tends to be better at multi-turn edits ("now make the background darker
-and remove the second person") and at generating an image that's
-correct relative to something discussed earlier in the same chat. It
-has historically lagged pure diffusion models on raw output fidelity
-and detail, though that gap has been closing as labs invest in native
-multimodal generation specifically.
+Autoregressive generation can integrate naturally with a token-based
+multimodal context, which may help instruction-following and conversational
+editing. That advantage is not automatic: the surrounding product may give
+a diffusion generator the same conversation through prompt rewriting and
+image conditioning, while an autoregressive model can still lose identity
+or detail between turns. Architecture alone does not rank the resulting
+products.
 
 The line between the two is blurring on purpose. Several labs now
 describe their flagship image generation as coming from the same model
@@ -178,7 +178,7 @@ task one of the three — counting, precise localization, small detail —
 where the model's known weaknesses are likely to bite? For generation:
 is this diffusion or an autoregressive model reasoning in the same
 context as the conversation, and does the task actually need the
-multi-turn consistency only the second one reliably gives? And for
+multi-turn consistency the product demonstrates? And for
 either: is the evaluation behind a vendor's claim a graded benchmark, or
 a preference ranking measuring something adjacent to correctness rather
 than correctness itself?

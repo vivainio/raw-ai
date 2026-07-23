@@ -17,21 +17,24 @@ This picks up where [Theory: Machine Learning Before
 LLMs](../machine-learning-before-llms/index.md) leaves off. Before
 transformers, sequence models were recurrent: an RNN or LSTM read
 a sentence one token at a time, carrying a running summary forward step
-by step. That worked, within limits — the running summary degraded over
-long sequences (the "vanishing gradient" problem), and because each step
+by step. That worked, within limits — recurrent networks had difficulty
+learning long-range dependencies, in part because gradients could vanish
+or explode during training, and because each step
 depended on the one before it, training couldn't be parallelized across
 a sequence the way it could across a batch. Both limits shaped what came
 next more than any single new idea did.
 
-The 2017 paper "Attention Is All You Need" removed the recurrence
-entirely. Instead of reading token-by-token in order, a transformer lets
-every token attend to every other token in the input directly, which
-made training parallelizable across the whole sequence at once — the
-architectural change that made scaling up model size and training data
-practical in the first place, not just a modeling nicety.
+The 2017 paper "Attention Is All You Need" removed recurrence from its
+sequence model. Self-attention lets positions exchange information
+directly, while masks control which positions are visible: an encoder can
+attend in both directions, while an autoregressive decoder cannot attend to
+future tokens. Training can compute all positions in a sequence in parallel,
+although generation still produces tokens sequentially. That parallel
+training and the architecture's scaling behavior helped make much larger
+models practical.
 
-GPT-1 (2018) was the first widely-noticed demonstration of what that
-architecture enabled combined with a specific training recipe:
+GPT-1 (2018) was an influential demonstration of what that architecture
+enabled when combined with a specific training recipe:
 unsupervised pretraining on raw text, followed by supervised fine-tuning
 on a specific task, showed that the language understanding picked up in
 pretraining transferred to tasks the model was never directly trained
@@ -84,12 +87,12 @@ time rather than assuming the word "open" in a release's name settles
 the question.
 
 **Genuinely permissive releases** exist: some models ship under a
-standard open-source license like Apache 2.0 or MIT, which places no
-restriction on commercial use, modification, or redistribution beyond
-the license's own boilerplate. If a model's license is one of these
-well-known software licenses, the terms are exactly what they say for
-any other software carrying that license — nothing model-specific to
-dig for.
+standard permissive license like Apache 2.0 or MIT, which generally permits
+commercial use, modification, and redistribution subject to conditions such
+as preserving notices. Apache 2.0 also includes express patent terms.
+Applying a software license to weights can still leave separate questions
+about training data, accompanying code, trademarks, and applicable law, so
+the short license text is not the whole diligence exercise.
 
 **Custom "open-weight" licenses** are more common at the frontier end of
 open releases, and they routinely carry restrictions a standard
@@ -97,11 +100,10 @@ open-source license wouldn't: a usage-scale threshold above which a
 commercial user needs a separate agreement directly with the vendor
 rather than relying on the published license (Llama's license works this
 way), and an acceptable-use policy layered on top of the license itself
-that names specific prohibited uses — often including using the model's
-outputs to train or improve a separate, competing model. That last clause
-is worth reading for specifically: it's become a standard defensive term
-across open-weight releases, aimed squarely at preventing a competitor
-from distilling your model into theirs.
+that names specific prohibited uses. Some licenses or policies also restrict
+using the model or its outputs to train a competing model. That clause is
+worth checking specifically, but it is not universal across open-weight
+releases and its wording varies.
 
 **Closed, API-only models** don't have a software license at all in the
 usual sense, since there are no weights to license — what governs them
