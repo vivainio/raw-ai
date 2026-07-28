@@ -121,6 +121,81 @@ the real-world result back in. Whether that result is a directory listing,
 a file's contents, or a web search result makes no structural difference to
 the model; it's all text in a `tool_result`.
 
+## How editing actually works
+
+Different tools hand back different shapes of thing. A search tool returns
+matches, not the whole file; a read tool returns the file with line numbers
+stapled on, capped at some length; a shell command returns whatever it
+printed. Editing tools are the odd ones out, because they don't just return
+data — they change a file on disk, and that means the harness needs some
+way to be sure the change it's about to make is the one the model actually
+intends.
+
+Most coding-agent harnesses solve this with find-and-replace rather than a
+real text editor. Claude Code's `Edit` takes a file path, an `old_string`,
+and a `new_string`. The harness looks for `old_string` verbatim in the
+file, swaps in `new_string`, and writes the result back. No line numbers,
+no diff syntax — just "this exact text becomes that exact text."
+
+Here's a real one, from a session working on this same book:
+
+```json
+{
+  "type": "tool_use",
+  "id": "toolu_01HY8vHSeVzRMueMuE6LJrsZ",
+  "name": "Edit",
+  "input": {
+    "file_path": "/home/v/r/raw-ai/docs/agent-skills/skillset.md",
+    "old_string": "    enabled: [bu-jira-process]",
+    "new_string": "    enabled: [mycompany-jira-process]",
+    "replace_all": false
+  }
+}
+```
+
+```json
+{
+  "type": "tool_result",
+  "tool_use_id": "toolu_01HY8vHSeVzRMueMuE6LJrsZ",
+  "content": "The file /home/v/r/raw-ai/docs/agent-skills/skillset.md has been updated successfully. (file state is current in your context — no need to Read it back)"
+}
+```
+
+Two constraints fall out of that design, and both exist to catch the same
+failure mode: a model editing a file it hasn't actually seen.
+
+- **`old_string` has to be unique in the file.** If it matches more than
+  one spot, the harness refuses the edit instead of guessing. The model
+  has to paste more surrounding context — enough lines before and after
+  that the match stops being ambiguous — or pass `replace_all: true` if it
+  genuinely wants every occurrence changed, like renaming a variable.
+- **`Read` has to happen before `Edit`.** Not a style convention — the tool
+  enforces it. The point is that `old_string` gets copied out of real,
+  current file content, not reconstructed from a summary a few turns back
+  or the model's memory of what the file probably still says.
+
+Both rules protect the same thing: an exact-match replace only works if the
+model is working from what's actually on disk right now. Line-number-based
+patches drift the moment an earlier edit shifts everything below it;
+matching on the text itself sidesteps that, since it doesn't care where a
+string sits, only that it appears exactly once.
+
+`Write` is the blunter counterpart — full file contents in, full file
+contents out, no matching involved. It's what gets called for a brand-new
+file, or when a change touches so much of the file that stitching together
+several old/new pairs would just be reconstructing the whole thing anyway.
+The same read-before-you-touch-it rule applies, for the same reason: the
+tool won't overwrite content the model never saw.
+
+Not every harness does it this way. Some instead have the model emit a
+unified diff — `@@ -12,3 +12,4 @@`-style hunks — and apply it the way
+`git apply` would, which trades away the uniqueness guarantee for a format
+that's closer to what version control already speaks. Exact-match
+old_string/new_string is the more common pattern in coding agents today,
+because it turns "did the model actually read this file" into something
+the harness can check mechanically, instead of taking the model's word
+for it.
+
 ## The user is also a tool
 
 `AskUserQuestion` — the mechanism the model uses to ask *you* something —
