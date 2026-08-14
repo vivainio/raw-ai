@@ -27,6 +27,7 @@ nav = [
     { "Skill + CLI instead of MCP" = "agent-skills/skill-vs-mcp.md" },
   ] },
   { "Agent Dialogue" = "agent-dialogue/index.md" },
+  { "Claude Code: Commands and Hooks" = "claude-code/index.md" },
   { "Agent Memory" = "agent-memory/index.md" },
   { "Theory: Machine Learning Before LLMs" = "machine-learning-before-llms/index.md" },
   { "Theory: Inference" = "inference/index.md" },

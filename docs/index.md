@@ -45,6 +45,10 @@ directory names and file formats, not the shape of the thing.
 - [Agent Dialogue](agent-dialogue/index.md) — what's actually in the system
   prompt, how a tool call is just a predicted block of JSON, and why asking
   you a question is the same mechanism as running a shell command.
+- [Claude Code: Commands, Configuration, and Hooks](claude-code/index.md) —
+  the command surface from `/branch` and `/goal` through permissions, hooks,
+  skills, subagents, and MCP, with the corresponding Codex mechanisms noted
+  where they differ.
 - [Agent Memory](agent-memory/index.md) — how Claude Code saves notes about
   you and the project between sessions: where the files live, what's in
   them, and why they're never fully trusted on read.
