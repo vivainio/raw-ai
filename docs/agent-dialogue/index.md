@@ -161,8 +161,7 @@ Here's a real one, from a session working on this same book:
 }
 ```
 
-Two constraints fall out of that design, and both exist to catch the same
-failure mode: a model editing a file it hasn't actually seen.
+Claude Code adds two constraints around that design:
 
 - **`old_string` has to be unique in the file.** If it matches more than
   one spot, the harness refuses the edit instead of guessing. The model
@@ -174,11 +173,11 @@ failure mode: a model editing a file it hasn't actually seen.
   current file content, not reconstructed from a summary a few turns back
   or the model's memory of what the file probably still says.
 
-Both rules protect the same thing: an exact-match replace only works if the
-model is working from what's actually on disk right now. Line-number-based
-patches drift the moment an earlier edit shifts everything below it;
-matching on the text itself sidesteps that, since it doesn't care where a
-string sits, only that it appears exactly once.
+The constraints address related but distinct risks. Uniqueness prevents the
+tool from choosing the wrong occurrence; the read requirement prevents the
+model from overwriting a file whose current contents it has not inspected.
+Exact matching also means that an earlier edit shifting the target up or down
+doesn't matter, since the replacement isn't tied to a line number.
 
 `Write` is the blunter counterpart — full file contents in, full file
 contents out, no matching involved. It's what gets called for a brand-new
@@ -187,14 +186,20 @@ several old/new pairs would just be reconstructing the whole thing anyway.
 The same read-before-you-touch-it rule applies, for the same reason: the
 tool won't overwrite content the model never saw.
 
-Not every harness does it this way. Some instead have the model emit a
-unified diff — `@@ -12,3 +12,4 @@`-style hunks — and apply it the way
-`git apply` would, which trades away the uniqueness guarantee for a format
-that's closer to what version control already speaks. Exact-match
-old_string/new_string is the more common pattern in coding agents today,
-because it turns "did the model actually read this file" into something
-the harness can check mechanically, instead of taking the model's word
-for it.
+Not every harness does it this way. Codex, for example, has an `apply_patch`
+tool: the model describes file operations as patch hunks with unchanged
+context around added and removed lines. Unified diffs use a similar idea,
+with headers such as `@@ -12,3 +12,4 @@`. Those line numbers are a suggested
+location, not the whole matching mechanism: an applicator such as
+`git apply` uses the surrounding context to find a hunk when earlier changes
+have shifted it.
+
+Both approaches can still fail safely when the file no longer matches what
+the model expected. Exact replacement rejects a missing or ambiguous string;
+patch application rejects a hunk whose context it cannot locate. Neither
+format, by itself, proves that the model read the file. If a harness wants
+that guarantee, it has to track reads and enforce the rule separately, as
+Claude Code does.
 
 ## The user is also a tool
 
